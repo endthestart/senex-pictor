@@ -1,0 +1,15 @@
+{
+  "source": "Adobe ColorMatrix (XYZ to camera, D65) as published in LibRaw 0.22.1's rgb_xyz_matrix, read through rawpy",
+  "cameras": [
+    {
+      "make": "NIKON CORPORATION",
+      "model": "NIKON Z 6_2",
+      "xyz_to_camera": [[0.9943, -0.3269, -0.0839], [-0.5323, 1.3269, 0.2259], [-0.1198, 0.2083, 0.7557]]
+    },
+    {
+      "make": "NIKON CORPORATION",
+      "model": "NIKON D700",
+      "xyz_to_camera": [[0.8139, -0.2171, -0.0663], [-0.8747, 1.6541, 0.2295], [-0.1925, 0.2008, 0.8093]]
+    }
+  ]
+}

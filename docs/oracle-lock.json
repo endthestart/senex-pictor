@@ -1,0 +1,42 @@
+{
+  "purpose": "Test oracles only (ADR 0007). Stored in ignored .sources/oracles/; never redistributed or copied into Star Photos.",
+  "fetched": "2026-10-25",
+  "oracles": [
+    {
+      "name": "rawspeed",
+      "repository": "https://github.com/darktable-org/rawspeed",
+      "commit": "0c16fee7772594e98897bded01fc31bc3409b4cb",
+      "license": "LGPL-2.1",
+      "files": [
+        {
+          "path": "data/cameras.xml",
+          "local": ".sources/oracles/rawspeed/cameras.xml",
+          "sha256": "720558e102cfd7b767e7681ad1866d6e68874edea91725808439eb95e9c414a6"
+        },
+        {
+          "path": "LICENSE",
+          "local": ".sources/oracles/rawspeed/LICENSE",
+          "sha256": "592987e8510228d546540b84a22444bde98e48d03078d3b2eefcd889bec5ce8c"
+        }
+      ]
+    },
+    {
+      "name": "RawTherapee",
+      "repository": "https://github.com/RawTherapee/RawTherapee",
+      "commit": "b2ee504c47e5e6d5e054395aa12bf1fe43bd1c3c",
+      "license": "GPL-3.0",
+      "files": [
+        {
+          "path": "rtengine/camconst.json",
+          "local": ".sources/oracles/rawtherapee/camconst.json",
+          "sha256": "1bc59b7325a6fa0faddf7e388ec92ad123bd9fb61bffcc689dd8b0edf219fa58"
+        },
+        {
+          "path": "LICENSE",
+          "local": ".sources/oracles/rawtherapee/LICENSE",
+          "sha256": "8c75a9231db8906865e29706ed63aad18fd918c92c15dbefbb13c25fe42850b4"
+        }
+      ]
+    }
+  ]
+}

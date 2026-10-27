@@ -1,0 +1,161 @@
+//! What the sequence check needs from each RAW: capture time and settings, the saturated
+//! share of the default crop, the sky level (median of the upper half) and the foreground
+//! colour (median of the lower half per colour), all from CFA samples above black, and the
+//! frame's look for motion between frames.
+
+use super::motion::{self, Look, Steps};
+use crate::budget::Budget;
+use crate::calibration::Mosaic;
+use crate::stars::similarity::Random;
+use crate::store::seconds;
+use crate::{Result, error, input};
+use serde::Serialize;
+use std::path::Path;
+
+/// Settings that must stay fixed within one run.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Settings {
+    pub model: Option<String>,
+    pub lens: Option<String>,
+    pub exposure_s: Option<f64>,
+    pub iso: Option<u32>,
+    pub aperture: Option<f64>,
+    pub focal_mm: Option<f64>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct Capture {
+    pub name: String,
+    pub time_s: f64,
+    pub settings: Settings,
+    pub saturated_share: f64,
+    /// Median of 2×2 site sums above black in the upper half (mostly sky).
+    pub sky_level: f64,
+    /// Median R, G, B above black in the lower half (mostly foreground).
+    pub ground_rgb: [f64; 3],
+}
+
+/// Frames decoded at once before their motion is measured.
+const CHUNK: usize = 32;
+/// Working set of one capture per sensor pixel: the RAW, its CFA samples above black, the
+/// lower half's samples and the half-resolution look.
+const CAPTURE_BYTES_PER_PIXEL: u64 = 40;
+/// A kept look per sensor pixel (half-resolution features).
+const LOOK_BYTES_PER_PIXEL: u64 = 1;
+
+pub fn capture(path: &Path) -> Result<(Capture, Look)> {
+    let (raw, identity) = input::decode(path)?;
+    let mosaic = Mosaic::from_raw(&raw)?;
+    let crop = raw.develop_crop(mosaic.width, mosaic.height);
+    let m = &raw.metadata;
+    let time_s = m
+        .capture_time
+        .as_ref()
+        .map(seconds)
+        .ok_or_else(|| error(format!("{}: no capture time", identity.filename)))?;
+    let at = |x: usize, y: usize| (crop.x + x, crop.y + y);
+    let above = |x: usize, y: usize| {
+        let (ax, ay) = at(x, y);
+        mosaic.data[ay * mosaic.width + ax] - mosaic.black.at(ax, ay, 0, 1)
+    };
+    let (w, h) = (crop.width / 2 * 2, crop.height / 2 * 2);
+    let mut saturated = 0usize;
+    for y in 0..crop.height {
+        for x in 0..crop.width {
+            let (ax, ay) = at(x, y);
+            saturated += usize::from(mosaic.data[ay * mosaic.width + ax] >= mosaic.white);
+        }
+    }
+    let mut sky: Vec<f32> = (0..h / 4)
+        .flat_map(|j| (0..w / 2).map(move |i| (2 * i, 2 * j)))
+        .map(|(x, y)| above(x, y) + above(x + 1, y) + above(x, y + 1) + above(x + 1, y + 1))
+        .collect();
+    let mut ground: [Vec<f32>; 3] = Default::default();
+    for y in h / 2..h {
+        for x in 0..w {
+            let (ax, ay) = at(x, y);
+            ground[usize::from(mosaic.cfa.color_at(ax, ay))].push(above(x, y));
+        }
+    }
+    let look = motion::look(&mosaic, (crop.x, crop.y, crop.width, crop.height))?;
+    let capture = Capture {
+        name: identity.filename,
+        time_s,
+        settings: Settings {
+            model: m.model.clone(),
+            lens: m.lens_model.clone(),
+            exposure_s: m.exposure_time,
+            iso: m.iso,
+            aperture: m.f_number,
+            focal_mm: m.focal_length,
+        },
+        saturated_share: saturated as f64 / (crop.width * crop.height) as f64,
+        sky_level: median(&mut sky)?,
+        ground_rgb: [
+            median(&mut ground[0])?,
+            median(&mut ground[1])?,
+            median(&mut ground[2])?,
+        ],
+    };
+    Ok((capture, look))
+}
+
+pub fn median(values: &mut [f32]) -> Result<f64> {
+    if values.is_empty() {
+        return Err(error("median of no samples"));
+    }
+    let mid = values.len() / 2;
+    let (_, v, _) = values.select_nth_unstable_by(mid, f32::total_cmp);
+    Ok(f64::from(*v))
+}
+
+/// `capture` for every path, as many at a time as `budget` allows, in path order, with the
+/// motion from each frame to the next.
+pub fn capture_all(paths: &[std::path::PathBuf], budget: &Budget) -> Result<(Vec<Capture>, Steps)> {
+    use rayon::prelude::*;
+    let first = paths.first().ok_or_else(|| error("no RAW files"))?;
+    let [w, h] = input::inspect(first)?.sensor;
+    let pixels = (w * h) as u64;
+    let pool = budget.pool(
+        "the sequence check",
+        2 * CHUNK as u64 * LOOK_BYTES_PER_PIXEL * pixels,
+        CAPTURE_BYTES_PER_PIXEL * pixels,
+    )?;
+    pool.install(|| {
+        let mut captures = Vec::with_capacity(paths.len());
+        let mut steps = Steps::default();
+        let mut previous: Option<Look> = None;
+        for chunk in paths.chunks(CHUNK) {
+            let (caps, mut looks): (Vec<Capture>, Vec<Look>) = chunk
+                .par_iter()
+                .map(|p| capture(p))
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
+                .unzip();
+            if previous.is_none() {
+                steps.foreground.push(None);
+                steps.sky.push(None);
+            }
+            let chain: Vec<&Look> = previous.iter().chain(looks.iter()).collect();
+            let first = captures.len() + usize::from(previous.is_none());
+            let measured: Vec<_> = chain
+                .par_windows(2)
+                .enumerate()
+                .map(|(k, w)| {
+                    let mut random = Random::new((first + k) as u64);
+                    (
+                        motion::foreground_step(w[0], w[1]),
+                        motion::sky_step(w[0], w[1], &mut random),
+                    )
+                })
+                .collect();
+            for (f, s) in measured {
+                steps.foreground.push(f);
+                steps.sky.push(s);
+            }
+            captures.extend(caps);
+            previous = looks.pop();
+        }
+        Ok((captures, steps))
+    })
+}

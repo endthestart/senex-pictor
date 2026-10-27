@@ -1,0 +1,36 @@
+[package]
+name = "star-photos"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Full-resolution nightscape processing research"
+
+[workspace]
+exclude = ["vendor/lightcraft-classic"]
+
+[dependencies]
+bytemuck = "1"
+half = "2.7"
+jpeg-encoder = { version = "0.7", default-features = false, features = ["std"] }
+lcc-meta = { path = "vendor/lightcraft-classic/crates/meta" }
+lcc-raw = { path = "vendor/lightcraft-classic/crates/raw" }
+pollster = "1"
+quick-xml = "0.41"
+rayon = "1.12"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sysinfo = { version = "0.37", default-features = false, features = ["system", "disk"] }
+sha2 = "0.10"
+tiff = "0.11"
+wgpu = { version = "30", default-features = false, features = ["std", "parking_lot", "metal", "vulkan", "dx12", "wgsl"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+
+[profile.release]
+debug = "line-tables-only"

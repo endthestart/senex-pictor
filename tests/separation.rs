@@ -1,0 +1,114 @@
+use star_photos::Result;
+use star_photos::integrate::combine::{Sample, luminance_clipped, weighted};
+use star_photos::separate::filters::distance_squared;
+use star_photos::separate::matte::matte;
+use star_photos::separate::stats::Stats;
+use star_photos::stars::similarity::Random;
+
+#[test]
+fn the_distance_transform_is_exact_and_names_the_nearest_pixel() -> Result<()> {
+    let (w, h) = (37, 23);
+    let mut random = Random::new(5);
+    let known: Vec<bool> = (0..w * h).map(|_| random.below(17) == 0).collect();
+    let (dist, index) = distance_squared(&known, w, h).ok_or("some pixels are known")?;
+    for p in 0..w * h {
+        let (x, y) = ((p % w) as f64, (p / w) as f64);
+        let best = (0..w * h)
+            .filter(|&q| known[q])
+            .map(|q| ((q % w) as f64 - x).powi(2) + ((q / w) as f64 - y).powi(2))
+            .fold(f64::INFINITY, f64::min);
+        assert_eq!(dist[p], best, "pixel {p}");
+        assert!(known[index[p]]);
+        let (qx, qy) = ((index[p] % w) as f64, (index[p] / w) as f64);
+        assert_eq!((qx - x).powi(2) + (qy - y).powi(2), best);
+    }
+    Ok(())
+}
+
+#[test]
+fn clipping_drops_a_satellite_trail_and_keeps_the_noise() {
+    let mut samples: Vec<Sample> = (0..40)
+        .map(|i| Sample {
+            value: 100.0 + ((i * 7) % 11) as f32 - 5.0,
+            weight: 1.0,
+            frame: i,
+        })
+        .collect();
+    samples[17].value = 900.0;
+    let (mean, kept, halves) = weighted(&samples);
+    assert_eq!(kept, 39);
+    assert!((mean - 100.0).abs() < 1.0, "mean {mean}");
+    assert!(halves.iter().all(|h| (h - 100.0).abs() < 2.0));
+    let mut rgb: Vec<[f32; 3]> = (0..20)
+        .map(|i| [10.0 + (i % 3) as f32, 20.0, 30.0])
+        .collect();
+    rgb[3] = [500.0, 500.0, 500.0];
+    rgb[4] = [f32::NAN, 1.0, 1.0];
+    let (mean, kept, valid) = luminance_clipped(&rgb);
+    assert_eq!((kept, valid), (18, 19));
+    assert!((mean[1] - 20.0).abs() < 1e-4);
+}
+
+/// Sky in the upper half with star transits everywhere and one dead pixel, a dark tree trunk
+/// through it, dark ground in the lower half and a bright patch there without transits (lit bark).
+fn scene() -> Stats {
+    let (w, h) = (96, 64);
+    let p = |f: &dyn Fn(usize, usize) -> f32| -> Vec<f32> {
+        (0..w * h).map(|i| f(i % w, i / w)).collect()
+    };
+    let sky =
+        |x: usize, y: usize| (y < 32 && !(40..48).contains(&x) || y < 8) && (x, y) != (10, 20);
+    let level = |x: usize, y: usize| {
+        if sky(x, y) {
+            1000.0
+        } else if (60..70).contains(&x) && (44..54).contains(&y) {
+            900.0
+        } else {
+            100.0
+        }
+    };
+    Stats {
+        width: w,
+        height: h,
+        median: p(&level),
+        low: p(&level),
+        sigma: p(&|_, _| 20.0),
+        excess: p(&|x, y| if sky(x, y) { 0.02 } else { 0.0 }),
+        transit: p(&|x, y| if sky(x, y) { 0.02 } else { 0.0 }),
+        scatter: p(&|_, _| 20.0),
+        resolvable: vec![true; w * h],
+    }
+}
+
+#[test]
+fn the_matte_is_sky_where_stars_cross_and_ground_where_dark() -> Result<()> {
+    let s = scene();
+    let w = s.width;
+    let m = matte(&s, 50, None)?;
+    let at = |x: usize, y: usize| m.alpha[y * w + x];
+    assert_eq!(at(10, 10), 1.0, "clear sky");
+    assert_eq!(at(44, 20), 0.0, "the trunk between sky");
+    assert_eq!(at(5, 60), 0.0, "dark ground");
+    assert_eq!(
+        at(10, 20),
+        1.0,
+        "a one-pixel ground island in the sky counts as sky"
+    );
+    assert!(
+        at(65, 49) > 0.5,
+        "without segments a bright patch reads as sky by brightness"
+    );
+    let mut labels = vec![0u32; s.width * s.height];
+    for (i, l) in labels.iter_mut().enumerate() {
+        if i / w >= 32 {
+            *l = 1;
+        }
+    }
+    let segmented = matte(&s, 50, Some(&labels))?;
+    assert_eq!(
+        segmented.alpha[49 * w + 65],
+        0.0,
+        "motion outranks brightness inside a dark segment"
+    );
+    Ok(())
+}
