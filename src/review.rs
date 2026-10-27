@@ -85,11 +85,41 @@ fn rgb_of(p: &planes::Planes, prefix: &str) -> Result<Vec<[f32; 3]>> {
         .collect())
 }
 
-pub fn render(store: &Store, o: &Options) -> Result<Report> {
+/// A stored result with everything its rendering needs: the image, the frame it belongs to,
+/// the sky weight and clear sky, glow, flat field and the camera's colour transform.
+pub struct Prepared {
+    pub image: Vec<[f32; 3]>,
+    pub frame: usize,
+    pub alpha: Vec<f32>,
+    pub clear: Vec<bool>,
+    pub glow: Vec<[f32; 3]>,
+    pub flat: Vec<f32>,
+    pub wb: [f32; 3],
+    pub matrix: Matrix,
+    pub white: f32,
+}
+
+impl Prepared {
+    pub fn scene(&self) -> Scene<'_> {
+        Scene {
+            alpha: &self.alpha,
+            clear: &self.clear,
+            glow: &self.glow,
+            flat: &self.flat,
+            wb: self.wb,
+            matrix: self.matrix,
+            white: self.white,
+        }
+    }
+}
+
+/// The `planes` result of `store` (`final`, `hero`, `moment-…`) prepared for rendering, with
+/// the colour matrix in `matrix` or the camera's built-in one.
+pub fn prepare(store: &Store, planes: &str, matrix: Option<&Path>) -> Result<Prepared> {
     let (w, h) = (store.manifest.width, store.manifest.height);
-    let result = planes::load(&store.dir.join(format!("{}.planes", o.planes)))?;
+    let result = planes::load(&store.dir.join(format!("{planes}.planes")))?;
     let image = rgb_of(&result, "")?;
-    let hero = o.planes == "hero";
+    let hero = planes == "hero";
     let named = |name: &str| {
         store
             .manifest
@@ -106,7 +136,7 @@ pub fn render(store: &Store, o: &Options) -> Result<Report> {
                 .as_str()
                 .ok_or_else(|| error("hero.json names no hero"))?,
         )?
-    } else if let Some(centre) = o.planes.strip_prefix("moment-") {
+    } else if let Some(centre) = planes.strip_prefix("moment-") {
         named(centre)?
     } else {
         crate::separate::model(store)?.reference
@@ -142,30 +172,40 @@ pub fn render(store: &Store, o: &Options) -> Result<Report> {
             .collect()
     };
     let flat = crate::integrate::recorded_flat(store)?;
-    let xyz_to_camera = xyz_to_camera(store, o.matrix)?;
-    let scene = Scene {
-        alpha: &alpha,
-        clear: &clear,
-        glow: &glow,
-        flat: &flat,
+    let xyz_to_camera = xyz_to_camera(store, matrix)?;
+    Ok(Prepared {
+        image,
+        frame,
+        alpha,
+        clear,
+        glow,
+        flat,
         wb: store.manifest.frames[frame].wb,
         matrix: render::camera_to_srgb(&xyz_to_camera)?,
         white: store.manifest.frames[frame].scale_adu,
-    };
+    })
+}
+
+pub fn render(store: &Store, o: &Options) -> Result<Report> {
+    let h = store.manifest.height;
+    let p = prepare(store, o.planes, o.matrix)?;
+    let (frame, flat, clear, image) = (p.frame, &p.flat, &p.clear, &p.image);
+    let w = store.manifest.width;
+    let scene = p.scene();
     let single: Vec<[f32; 3]> = store
         .rgb_rows(frame, 0, h)?
         .as_chunks::<3>()
         .0
         .iter()
-        .zip(&flat)
+        .zip(flat)
         .map(|(c, f)| c.map(|v| v / f))
         .collect();
-    let mut images: Vec<&[[f32; 3]]> = vec![&image];
+    let mut images: Vec<&[[f32; 3]]> = vec![image];
     if o.single {
         images.push(&single);
     }
-    let lin = render::linear(&image, &scene, &o.look);
-    let (black, scale) = render::levels(&lin, &clear, &o.look)?;
+    let lin = render::linear(image, &scene, &o.look);
+    let (black, scale) = render::levels(&lin, clear, &o.look)?;
     let shown = render::compare(&images, &scene, &o.look)?;
     let mut files = Vec::new();
     let stem = o.out.to_string_lossy().into_owned();
@@ -192,7 +232,7 @@ pub fn render(store: &Store, o: &Options) -> Result<Report> {
     if o.linear {
         export::linear(
             Path::new(&format!("{stem}-linear.tif")),
-            &image,
+            image,
             w,
             h,
             &description,

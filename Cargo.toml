@@ -6,7 +6,12 @@ publish = false
 description = "Full-resolution nightscape processing research"
 
 [workspace]
-exclude = ["vendor/lightcraft-classic"]
+members = ["spikes/canvas"]
+exclude = ["vendor/lightcraft-classic", "vendor/egui-wgpu"]
+
+[patch.crates-io]
+# egui-wgpu 0.36.2 with LightCraft Classic's HDR display patch (vendor/README.md)
+egui-wgpu = { path = "vendor/egui-wgpu" }
 
 [dependencies]
 bytemuck = "1"

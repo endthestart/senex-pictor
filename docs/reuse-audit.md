@@ -38,7 +38,11 @@ lockfile through the vendored crates, so nothing new was downloaded: `half` 2.7 
 1 (MIT/Apache-2.0; the GPU sky stack), all from the local registry cache LightCraft uses. R7
 added `sysinfo` 0.37 (MIT, free memory for the default memory budget). The built-in colour
 matrices (`data/colour-matrices.json`) are Adobe's published ColorMatrix values for the Z6 II
-and D700, read from LibRaw's table through the rawpy oracle.
+and D700, read from LibRaw's table through the rawpy oracle. The canvas spike
+(`spikes/canvas`) uses eframe/egui 0.36 (MIT/Apache-2.0) with `vendor/egui-wgpu`: egui-wgpu
+0.36.2 (MIT OR Apache-2.0) copied from LightCraft Classic's vendor folder with its HDR display
+patch (an `Rgba16Float` extended-linear-sRGB surface and egui drawn at SDR white), wired in through
+`[patch.crates-io]`; licence texts are in that folder.
 
 Source files are copied verbatim from the pinned upstream commit. The subset workspace
 Cargo.toml is adapted to expose only these crates and their dependency declarations.

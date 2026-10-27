@@ -1,0 +1,24 @@
+[package]
+name = "canvas-spike"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Toolkit validation spike: a 45 MP canvas on a shared wgpu device in eframe"
+
+[dependencies]
+bytemuck = { version = "1", features = ["derive"] }
+eframe = { version = "0.36", default-features = false, features = ["default_fonts", "wgpu", "accesskit"] }
+egui = "0.36"
+half = "2.7"
+pollster = "1"
+serde_json = "1"
+star-photos = { path = "../.." }
+wgpu = { version = "30", default-features = false, features = ["std", "parking_lot", "metal", "vulkan", "dx12", "wgsl"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
