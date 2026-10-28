@@ -3,6 +3,7 @@ use star_photos::sequence::{Capture, Settings, Steps, check};
 
 fn settings() -> Settings {
     Settings {
+        make: Some("Nikon".into()),
         model: Some("Z 6_2".into()),
         lens: Some("NIKKOR Z 20mm f/1.8 S".into()),
         exposure_s: Some(20.0),
@@ -40,7 +41,7 @@ fn gaps_and_setting_changes_split_runs_and_the_longest_is_recommended() -> Resul
     let runs: Vec<(String, usize, &str)> = report
         .runs
         .iter()
-        .map(|r| (r.first.clone(), r.frames, r.starts_after))
+        .map(|r| (r.first.clone(), r.frames, r.starts_after.as_str()))
         .collect();
     assert_eq!(
         runs,

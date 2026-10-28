@@ -152,6 +152,7 @@ pub fn stage(
                 lens: lens.as_deref(),
                 kernel: cfa::KERNEL,
                 gpu: device.as_ref(),
+                name: "hero",
             };
             json(hero::hero(&store, &options, budget)?)
         }
@@ -197,9 +198,9 @@ pub fn process(
         .get("--run")
         .map(|v| v.parse().map_err(|e| error(format!("--run: {e}"))))
         .transpose()?;
+    let survey = star_photos::process::survey_for(raw, out, budget)?;
     star_photos::process::process(
         &star_photos::process::Options {
-            raw,
             out,
             run,
             first: o.get("--first").map(String::as_str),
@@ -211,6 +212,7 @@ pub fn process(
             matrix: o.get("--matrix").map(Path::new),
             look: look(&o)?,
         },
+        &survey,
         budget,
     )
 }
@@ -229,7 +231,8 @@ pub fn render(dir: &Path, planes: &str, out: &Path, rest: &[OsString]) -> Result
             look: look(&o)?,
             matrix: o.get("--matrix").map(Path::new),
             out,
-            side: o.get("--side").map_or(Ok(review::SIDE), |v| v.parse())?,
+            jpeg: Some(o.get("--side").map_or(Ok(review::SIDE), |v| v.parse())?),
+            tiff: true,
             single: yes("--single"),
             linear: yes("--linear"),
         },

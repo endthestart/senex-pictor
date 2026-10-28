@@ -1,89 +1,50 @@
-//! The Compare screen (design board 5): two renderings of the same stack, both on the GPU.
-//! Space swaps them in place with nothing in between; S splits the view with a draggable line;
-//! the right side shows regions chosen from the scene as 200% crops of both, each with an
-//! A / same / B verdict saved in the project folder; the left side tunes each look live.
+//! The Compare step (design board 5), the hub every step returns to: two renderings of the
+//! same result, both on the GPU. Space swaps them in place with nothing in between; S splits
+//! the view with a draggable line; the side panel picks each side's look and shows regions
+//! chosen from the scene as 200% crops of both, each with an A / same / B verdict saved in the
+//! project folder.
 
 mod regions;
 mod verdict;
-mod view;
 
-use crate::display::Display;
-use crate::gpu::canvas::CanvasGpu;
-use crate::gpu::look::Looks;
-use crate::project::Project;
-use crate::scene::LookParams;
+use crate::theme::MUTED;
+use crate::viewer::{Canvas, Viewer, Zoom};
+use crate::widgets::{self, card, section, strong};
+use egui::{RichText, Ui};
 use regions::Region;
+use star_photos::Result;
+use star_photos::render::{self, Look};
+use std::path::PathBuf;
 use verdict::{Choice, Verdicts};
-use view::Zoom;
+
+/// Zoom of the region crops, physical px per rendering px.
+const CROP_ZOOM: f32 = 2.0;
+
+/// Uniform slots: 0 main, then two per crop.
+const FIRST_CROP_SLOT: u64 = 1;
+
+/// The looks a side can show.
+const PRESETS: [(&str, Look); 2] = [("Natural", render::NATURAL), ("Dark", render::DARK)];
 
 pub struct Compare {
-    device: wgpu::Device,
-    queue: wgpu::Queue,
-    looks: Looks,
-    params: [LookParams; 2],
-    defaults: [LookParams; 2],
-    names: [&'static str; 2],
-    size: [u32; 2],
-    display: Display,
-    swap: bool,
-    split: Option<f32>,
-    zoom: Zoom,
-    centre: [f32; 2],
+    pub canvas: Canvas,
     regions: Vec<Region>,
     verdicts: Verdicts,
-    pub name: String,
-    pub facts: Vec<String>,
-    recompute_ms: Option<f64>,
+    dir: Option<PathBuf>,
     pub error: Option<String>,
 }
 
 impl Compare {
-    /// Uploads `project` to the GPU (at `mp` megapixels if given), renders both looks and
-    /// registers the canvas.
-    pub fn new(
-        rs: &eframe::egui_wgpu::RenderState,
-        display: Display,
-        project: Project,
-        mp: Option<f64>,
-    ) -> star_photos::Result<Compare> {
-        let scene = &project.scene;
-        let size = crate::scene::output_size(scene, mp);
-        let (device, queue) = (rs.device.clone(), rs.queue.clone());
-        let looks = Looks::new(&device, &queue, scene, size)?;
-        for (k, p) in scene.looks.iter().enumerate() {
-            looks.apply(&device, &queue, k, p)?;
-        }
-        rs.renderer
-            .write()
-            .callback_resources
-            .insert(CanvasGpu::new(&device, rs.target_format, &looks.outputs));
-        let k = [
-            size[0] as f32 / scene.width as f32,
-            size[1] as f32 / scene.height as f32,
-        ];
-        let mut regions = regions::choose(scene);
-        for r in &mut regions {
-            r.centre = [r.centre[0] * k[0], r.centre[1] * k[1]];
-        }
-        let verdicts = Verdicts::load(project.dir.as_deref(), scene.names[0], scene.names[1])?;
+    pub fn new(viewer: &Viewer, dir: Option<PathBuf>) -> Result<Compare> {
+        let verdicts = Verdicts::load(dir.as_deref(), &viewer.names[0], &viewer.names[1])?;
         Ok(Compare {
-            device,
-            queue,
-            looks,
-            params: scene.looks,
-            defaults: scene.looks,
-            names: scene.names,
-            size,
-            display,
-            swap: false,
-            split: None,
-            zoom: Zoom::Fit,
-            centre: [0.0; 2],
-            regions,
+            canvas: Canvas {
+                tags: true,
+                ..Canvas::single(false)
+            },
+            regions: regions::choose(&viewer.scene),
             verdicts,
-            name: project.name,
-            facts: project.facts,
-            recompute_ms: None,
+            dir,
             error: None,
         })
     }
@@ -94,117 +55,142 @@ impl Compare {
         }
         ctx.input(|i| {
             if i.key_pressed(egui::Key::Space) {
-                self.swap = !self.swap;
+                self.canvas.swap = !self.canvas.swap;
             }
             if i.key_pressed(egui::Key::S) {
-                self.split = if self.split.is_some() {
-                    None
-                } else {
-                    Some(0.5)
+                self.canvas.split = match self.canvas.split {
+                    Some(_) => None,
+                    None => Some(0.5),
                 };
-            }
-            if i.key_pressed(egui::Key::F) {
-                self.zoom = Zoom::Fit;
-            }
-            for (key, z) in [(egui::Key::Num1, 1.0), (egui::Key::Num2, 2.0)] {
-                if i.key_pressed(key) {
-                    self.zoom = Zoom::Factor(z);
-                }
             }
         });
     }
 
-    /// A scripted step `t` (0–1) of a benchmark run: a third each at fit, 100% and 200%, panning
-    /// across, swapping every 15 frames. Returns the phase.
-    pub fn script(&mut self, t: f64, frame: usize) -> &'static str {
+    /// A scripted step `t` (0–1) of a benchmark run: a third each at fit, 100% and 200%,
+    /// panning across, swapping every 15 frames. Returns the phase.
+    pub fn script(&mut self, viewer: &mut Viewer, t: f64, frame: usize) -> &'static str {
         let sweep = ((t * 3.0).fract() as f32 * std::f32::consts::TAU).sin() * 0.4 + 0.5;
         if frame.is_multiple_of(15) {
-            self.swap = !self.swap;
+            self.canvas.swap = !self.canvas.swap;
         }
         let (zoom, name) = match (t * 3.0) as usize {
             0 => (Zoom::Fit, "fit"),
             1 => (Zoom::Factor(1.0), "100%"),
             _ => (Zoom::Factor(2.0), "200%"),
         };
-        self.zoom = zoom;
-        self.centre = [self.size[0] as f32 * sweep, self.size[1] as f32 * 0.5];
+        viewer.zoom = zoom;
+        viewer.centre = [viewer.size[0] as f32 * sweep, viewer.size[1] as f32 * 0.5];
         name
     }
 
-    /// Sets look `k`'s sky stretch and recomputes it on the GPU.
-    fn restretch(&mut self, k: usize, stretch: f32) {
-        self.params[k] = self.params[k].stretched(stretch);
-        match self
-            .looks
-            .apply(&self.device, &self.queue, k, &self.params[k])
-        {
-            Ok(t) => self.recompute_ms = Some(t * 1e3),
-            Err(e) => self.error = Some(e.to_string()),
-        }
+    pub fn show(&mut self, ui: &mut Ui, viewer: &mut Viewer) {
+        viewer.canvas(ui, &mut self.canvas);
     }
 
-    pub fn looks_panel(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Looks");
-        for k in 0..2 {
-            let mut stretch = self.params[k].stretch;
-            ui.label(format!("{} · {}", ["A", "B"][k], self.names[k]));
-            ui.horizontal(|ui| {
-                let slider = egui::Slider::new(&mut stretch, 0.5..=30.0).text("sky stretch");
-                if ui.add(slider).changed() {
-                    self.restretch(k, stretch);
+    fn side(&mut self, ui: &mut Ui, viewer: &mut Viewer, k: usize) {
+        ui.horizontal(|ui| {
+            ui.label(strong(["A", "B"][k]));
+            let names: Vec<&str> = PRESETS.iter().map(|(n, _)| *n).collect();
+            let selected = names.iter().position(|n| *n == viewer.names[k]);
+            if let Some(i) = widgets::segmented(ui, &names, selected)
+                && Some(i) != selected
+            {
+                let (name, look) = PRESETS[i];
+                if let Err(e) = viewer.set_named(k, name, look) {
+                    self.error = Some(e.to_string());
                 }
-                if ui.button("Reset").clicked() {
-                    self.restretch(k, self.defaults[k].stretch);
+                match Verdicts::load(self.dir.as_deref(), &viewer.names[0], &viewer.names[1]) {
+                    Ok(v) => self.verdicts = v,
+                    Err(e) => self.error = Some(e.to_string()),
                 }
-            });
-        }
-        if let Some(ms) = self.recompute_ms {
-            ui.weak(format!("look recomputed on the GPU in {ms:.0} ms"));
-        }
-        ui.separator();
-        ui.weak(
-            "Space swap · S split · F fit · 1 = 100% · 2 = 200% · drag to pan · scroll to zoom",
-        );
-        ui.separator();
-        for line in &self.display.lines {
-            ui.weak(line);
-        }
-    }
-
-    pub fn regions_panel(&mut self, ui: &mut egui::Ui) {
-        let [a, same, b] = self.verdicts.tally();
-        ui.heading("Where to look");
-        ui.label(format!("A better: {a} · same: {same} · B better: {b}"));
-        ui.weak(if self.verdicts.saved() {
-            "saved in compare.json in the project folder"
-        } else {
-            "not saved (no project folder)"
-        });
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            for r in 0..self.regions.len() {
-                ui.separator();
-                ui.strong(self.regions[r].name);
-                ui.weak(self.regions[r].look_for);
-                if self.crops(ui, r) {
-                    self.centre = self.regions[r].centre;
-                    self.zoom = Zoom::Factor(2.0);
-                }
-                let name = self.regions[r].name;
-                ui.horizontal(|ui| {
-                    for (choice, label) in [
-                        (Choice::First, "A better"),
-                        (Choice::Same, "Same"),
-                        (Choice::Second, "B better"),
-                    ] {
-                        let on = self.verdicts.get(name) == Some(choice);
-                        if ui.selectable_label(on, label).clicked()
-                            && let Err(e) = self.verdicts.set(name, choice)
-                        {
-                            self.error = Some(e.to_string());
-                        }
-                    }
-                });
+            }
+            if selected.is_none() {
+                ui.label(RichText::new(&viewer.names[k]).color(MUTED));
             }
         });
+    }
+
+    pub fn panel(&mut self, ui: &mut Ui, viewer: &mut Viewer) {
+        ui.spacing_mut().item_spacing.y = 10.0;
+        card(ui, |ui| {
+            section(ui, "Renderings");
+            self.side(ui, viewer, 0);
+            self.side(ui, viewer, 1);
+            ui.add_space(4.0);
+            widgets::key_hints(
+                ui,
+                &[
+                    ("Space", "swap A and B"),
+                    ("S", "split"),
+                    ("F", "fit"),
+                    ("1  2", "100%  200%"),
+                ],
+            );
+            if let Some(e) = &self.error {
+                ui.colored_label(crate::theme::WARN, e);
+            }
+        });
+        let [a, same, b] = self.verdicts.tally();
+        card(ui, |ui| {
+            section(ui, "Where to look");
+            ui.label(widgets::muted(format!(
+                "A better {a} · same {same} · B better {b}{}",
+                if self.verdicts.saved() {
+                    ""
+                } else {
+                    " · not saved without a project folder"
+                }
+            )));
+        });
+        egui::ScrollArea::vertical()
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                for r in 0..self.regions.len() {
+                    self.region(ui, viewer, r);
+                }
+            });
+    }
+
+    fn region(&mut self, ui: &mut Ui, viewer: &mut Viewer, r: usize) {
+        let centre = viewer.rendering_point(self.regions[r].centre);
+        let name = self.regions[r].name;
+        card(ui, |ui| {
+            ui.label(strong(name));
+            ui.label(widgets::muted(self.regions[r].look_for));
+            let mut clicked = false;
+            let side = (ui.available_width() - ui.spacing().item_spacing.x) / 2.0;
+            ui.horizontal(|ui| {
+                for k in 0..2 {
+                    let slot = FIRST_CROP_SLOT + 2 * r as u64 + k as u64;
+                    let response = viewer.crop(ui, centre, CROP_ZOOM, k, slot, side);
+                    ui.painter().text(
+                        response.rect.left_top() + egui::vec2(6.0, 4.0),
+                        egui::Align2::LEFT_TOP,
+                        ["A", "B"][k],
+                        egui::FontId::proportional(13.0),
+                        egui::Color32::WHITE,
+                    );
+                    clicked |= response.clicked();
+                }
+            });
+            if clicked {
+                viewer.centre = centre;
+                viewer.zoom = Zoom::Factor(CROP_ZOOM);
+            }
+            let choices = [Choice::First, Choice::Same, Choice::Second];
+            let selected = choices
+                .iter()
+                .position(|c| self.verdicts.get(name) == Some(*c));
+            if let Some(i) = widgets::segmented(ui, &["A better", "Same", "B better"], selected)
+                && let Err(e) = self.verdicts.set(name, choices[i])
+            {
+                self.error = Some(e.to_string());
+            }
+        });
+    }
+
+    /// Regions judged so far.
+    pub fn judged(&self) -> usize {
+        self.verdicts.tally().iter().sum()
     }
 }

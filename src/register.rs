@@ -46,10 +46,17 @@ pub fn detect_all(store: &Store, budget: &Budget) -> Result<Vec<Vec<Star>>> {
     use rayon::prelude::*;
     let (w, h) = (store.manifest.width, store.manifest.height);
     let pool = budget.pool("star detection", 0, DETECT_BYTES_PER_PIXEL * (w * h) as u64)?;
+    budget
+        .progress
+        .step("Finding stars", store.manifest.frames.len());
     pool.install(|| {
         (0..store.manifest.frames.len())
             .into_par_iter()
-            .map(|i| detect(&store.luminance(i)?, &store.saturated_rows(i, 0, h)?, w, h))
+            .map(|i| {
+                let stars = detect(&store.luminance(i)?, &store.saturated_rows(i, 0, h)?, w, h)?;
+                budget.progress.advance()?;
+                Ok(stars)
+            })
             .collect()
     })
 }
@@ -97,6 +104,7 @@ pub fn register(store: &Store, lens_from: Option<&Path>, budget: &Budget) -> Res
     let clock = std::time::Instant::now();
     let found = detect_all(store, budget)?;
     let detected = clock.elapsed().as_secs_f64();
+    budget.progress.step("Matching stars across frames", 0);
     let tracks = track(&found)?;
     let tracked = clock.elapsed().as_secs_f64() - detected;
     let reference = (n - 1) / 2;
@@ -128,6 +136,7 @@ pub fn register(store: &Store, lens_from: Option<&Path>, budget: &Budget) -> Res
         .filter(|&i| i != reference)
         .collect();
     let times = times(store);
+    budget.progress.step("Fitting the sky's motion", 0);
     let fixed = fit(&found, &tracks, &times, reference, &subset, size, start)?;
     let names: Vec<String> = store
         .manifest

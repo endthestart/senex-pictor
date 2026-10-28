@@ -8,7 +8,7 @@
 use super::capture::Capture;
 use super::motion::Steps;
 use crate::{Result, error};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// A gap longer than this many typical intervals (and at least MIN_GAP_S) starts a new run.
 pub const GAP_FACTOR: f64 = 3.0;
@@ -33,7 +33,7 @@ pub const SKY_BREAK_PX: f64 = 1.5;
 pub const SKY_BREAK_DEG: f64 = 0.02;
 const SKY_WINDOW: usize = 4;
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Twilight {
     /// Sky level at the brighter end of the run over the darker end (smoothed).
     pub brightening: f64,
@@ -41,12 +41,12 @@ pub struct Twilight {
     pub dark_last: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Run {
     pub first: String,
     pub last: String,
     pub frames: usize,
-    pub starts_after: &'static str,
+    pub starts_after: String,
     pub overexposed: Vec<String>,
     pub lit: Vec<String>,
     pub twilight: Option<Twilight>,
@@ -59,7 +59,7 @@ pub struct Run {
     pub drift_px: [f64; 2],
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Report {
     pub interval_s: f64,
     pub runs: Vec<Run>,
@@ -187,7 +187,7 @@ fn sky_break(steps: &Steps, i: usize, a: usize, b: usize) -> bool {
         || (me[2] - typical[2]).abs() > SKY_BREAK_DEG
 }
 
-fn run(c: &[Capture], steps: &Steps, a: usize, b: usize, starts_after: &'static str) -> Run {
+fn run(c: &[Capture], steps: &Steps, a: usize, b: usize, starts_after: &str) -> Run {
     let names = |idx: &[usize]| idx.iter().map(|&i| c[i].name.clone()).collect::<Vec<_>>();
     let over: Vec<usize> = (a..b)
         .filter(|&i| c[i].saturated_share > OVEREXPOSED_SHARE)
@@ -205,7 +205,7 @@ fn run(c: &[Capture], steps: &Steps, a: usize, b: usize, starts_after: &'static 
         first: c[a].name.clone(),
         last: c[b - 1].name.clone(),
         frames: b - a,
-        starts_after,
+        starts_after: starts_after.into(),
         overexposed: names(&over),
         lit: names(&lit(c, &usable)),
         twilight: twilight.map(|(brightening, range)| Twilight {

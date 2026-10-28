@@ -27,6 +27,16 @@ struct Cameras {
     cameras: Vec<Camera>,
 }
 
+/// The built-in colour matrix for a camera, if there is one.
+pub fn built_in_matrix(make: &str, model: &str) -> Result<Option<Matrix>> {
+    let known: Cameras = serde_json::from_str(include_str!("../data/colour-matrices.json"))?;
+    Ok(known
+        .cameras
+        .into_iter()
+        .find(|c| c.make == make && c.model == model)
+        .map(|c| c.xyz_to_camera))
+}
+
 /// The colour matrix in `path`, or the built-in one for the store's camera.
 fn xyz_to_camera(store: &Store, path: Option<&Path>) -> Result<Matrix> {
     if let Some(path) = path {
@@ -38,17 +48,11 @@ fn xyz_to_camera(store: &Store, path: Option<&Path>) -> Result<Matrix> {
         m.make.as_deref().unwrap_or(""),
         m.model.as_deref().unwrap_or(""),
     );
-    let known: Cameras = serde_json::from_str(include_str!("../data/colour-matrices.json"))?;
-    known
-        .cameras
-        .into_iter()
-        .find(|c| c.make == make && c.model == model)
-        .map(|c| c.xyz_to_camera)
-        .ok_or_else(|| {
-            error(format!(
-                "no built-in colour matrix for {make} {model}; give one (--matrix JSON)"
-            ))
-        })
+    built_in_matrix(make, model)?.ok_or_else(|| {
+        error(format!(
+            "no built-in colour matrix for {make} {model}; give one (--matrix JSON)"
+        ))
+    })
 }
 
 #[derive(Debug, Serialize)]
@@ -70,7 +74,10 @@ pub struct Options<'a> {
     /// A colour matrix file; the built-in one for the camera when absent.
     pub matrix: Option<&'a Path>,
     pub out: &'a Path,
-    pub side: usize,
+    /// The display JPEG's longest side; no JPEG when absent.
+    pub jpeg: Option<usize>,
+    /// The display image as a 16-bit TIFF at full size.
+    pub tiff: bool,
     pub single: bool,
     pub linear: bool,
 }
@@ -119,7 +126,7 @@ pub fn prepare(store: &Store, planes: &str, matrix: Option<&Path>) -> Result<Pre
     let (w, h) = (store.manifest.width, store.manifest.height);
     let result = planes::load(&store.dir.join(format!("{planes}.planes")))?;
     let image = rgb_of(&result, "")?;
-    let hero = planes == "hero";
+    let hero = planes == "hero" || planes.starts_with("hero-");
     let named = |name: &str| {
         store
             .manifest
@@ -130,11 +137,11 @@ pub fn prepare(store: &Store, planes: &str, matrix: Option<&Path>) -> Result<Pre
     };
     let frame = if hero {
         let report: serde_json::Value =
-            serde_json::from_slice(&std::fs::read(store.dir.join("hero.json"))?)?;
+            serde_json::from_slice(&std::fs::read(store.dir.join(format!("{planes}.json")))?)?;
         named(
             report["hero"]
                 .as_str()
-                .ok_or_else(|| error("hero.json names no hero"))?,
+                .ok_or_else(|| error(format!("{planes}.json names no hero")))?,
         )?
     } else if let Some(centre) = planes.strip_prefix("moment-") {
         named(centre)?
@@ -218,16 +225,21 @@ pub fn render(store: &Store, o: &Options) -> Result<Report> {
         } else {
             format!("{stem}-single")
         };
-        let (small, sw, sh) = export::reduce(display, w, h, o.side);
-        export::jpeg(Path::new(&format!("{name}.jpg")), &small, sw, sh, 92)?;
-        export::tiff16(
-            Path::new(&format!("{name}.tif")),
-            display,
-            w,
-            h,
-            &description,
-        )?;
-        files.extend([format!("{name}.jpg"), format!("{name}.tif")]);
+        if let Some(side) = o.jpeg {
+            let (small, sw, sh) = export::reduce(display, w, h, side);
+            export::jpeg(Path::new(&format!("{name}.jpg")), &small, sw, sh, 92)?;
+            files.push(format!("{name}.jpg"));
+        }
+        if o.tiff {
+            export::tiff16(
+                Path::new(&format!("{name}.tif")),
+                display,
+                w,
+                h,
+                &description,
+            )?;
+            files.push(format!("{name}.tif"));
+        }
     }
     if o.linear {
         export::linear(

@@ -96,6 +96,7 @@ pub fn foreground_displacement(
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(workers)
         .build()?;
+    budget.progress.step("Tracking the foreground", order.len());
     let mut lost = Vec::new();
     let mut shifts: Vec<(usize, [f64; 2])> = vec![(reference, [0.0, 0.0])];
     let mut out = vec![(
@@ -119,6 +120,7 @@ pub fn foreground_displacement(
                 .collect::<Result<_>>()
         })?;
         for (&i, image) in chunk.iter().zip(&pyramids) {
+            budget.progress.advance()?;
             let (_, shift) = *shifts
                 .iter()
                 .min_by_key(|(j, _)| j.abs_diff(i))

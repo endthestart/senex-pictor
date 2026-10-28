@@ -106,12 +106,16 @@ pub fn build(
     let rows = (STRIP + 2 * HALO) as u64;
     let each = rows * w as u64 * (4 * n as u64 + WORK_BYTES_PER_PIXEL) + (n * STRIP * w) as u64;
     let pool = budget.pool("occlusion", Budget::held(w * h), each)?;
+    budget
+        .progress
+        .step("Finding where the ground hides the sky", h.div_ceil(STRIP));
     let counts: Vec<Vec<usize>> = pool.install(|| {
         (0..h)
             .step_by(STRIP)
             .collect::<Vec<_>>()
             .par_iter()
             .map(|&y0| {
+                budget.progress.advance()?;
                 let masks = strip(store, glow, &sky, flat, y0, (y0 + STRIP).min(h))?;
                 masks
                     .iter()

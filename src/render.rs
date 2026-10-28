@@ -20,7 +20,7 @@ const WEIGHTS: [f32; 3] = [0.2126, 0.7152, 0.0722];
 pub const VIGNETTE_KEPT: f32 = 0.4;
 
 /// A rendering look.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Look {
     pub remove_glow: bool,
     pub black_percentile: f64,
@@ -78,7 +78,7 @@ pub fn camera_to_srgb(xyz_to_camera: &Matrix) -> Result<Matrix> {
     invert(&srgb_to_camera).ok_or_else(|| error("colour matrix is singular"))
 }
 
-fn encode(v: f32) -> f32 {
+pub fn encode(v: f32) -> f32 {
     let a = v.clamp(0.0, 1.0);
     if a <= 0.003_130_8 {
         12.92 * a

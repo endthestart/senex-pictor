@@ -32,12 +32,23 @@ files to a finished image:
   and time) stay in the output folder.
 
 The desktop app (`app/`, egui on the shared wgpu device, [ADR 0011](docs/adr/0011-desktop-toolkit.md))
-opens a `process` output folder, a store or a scene file and so far has two steps: Open and
-Compare. Compare keeps two looks on the GPU (Space swaps them in place, S splits the view),
-shows regions chosen from the image as 200% crops of both with A / same / B verdicts saved to
-`compare.json`, and recomputes each look's sky stretch live. `cargo run --release -p
-star-photos-app -- [FOLDER]`; `cargo test -p star-photos-app` renders the window headlessly
-(`STAR_PHOTOS_UI_SHOTS=DIR` saves the frames).
+runs the same steps with six screens in a step list. **Import** checks a folder of RAW files
+in the background (runs, lit and overexposed frames, thumbnails), lets you choose the frames,
+checks lens, colour, memory and disk before anything is written, then processes with live
+progress, Cancel and Resume (a cancelled or failed run continues from its last finished
+stage). **Frames** shows why each frame was used (lit, lost, drift per frame, blink against
+the reference); **Sky & ground** tints the sky and the boundary over the result (O);
+**Scene** makes a hero frame or a short-window moment and opens it; **Compare** keeps two
+renderings on the GPU (Space swaps in place, S splits, chosen regions as 200% crops with
+A / same / B verdicts saved to `compare.json`); **Look & export** tunes the look live and
+exports the linear 32-bit master, a 16-bit TIFF or a JPEG. Drop a folder on the window or
+run `cargo run --release -p star-photos-app -- [FOLDER] [--step NAME]`.
+`cargo test -p star-photos-app` renders the window headlessly (`STAR_PHOTOS_UI_SHOTS=DIR`
+saves the frames; `STAR_PHOTOS_UI_FOLDER`, `STAR_PHOTOS_UI_RAW` and `STAR_PHOTOS_UI_STOPPED`
+point the screen tests at a processed folder, a RAW folder and a stopped run).
+
+`process` itself resumes too: run the same command into the same output folder and it keeps
+the finished stages, removes what the interrupted stage left in the store, and goes on.
 
 Every command takes `--memory GB` (before the command): the memory the run may use. Without
 it the run takes 75% of the memory free when it starts. Each parallel step runs as many

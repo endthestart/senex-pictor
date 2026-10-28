@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-10-27 (Rust port R7: one command from folder to finished image).
+Updated: 2026-10-27 (desktop app: all six steps; process resumes).
 
 ## Milestone gates
 
@@ -23,6 +23,18 @@ Updated: 2026-10-27 (Rust port R7: one command from folder to finished image).
   provenance report. 18 synthetic-truth tests; deliberate faults caught. Not in the CLI.
 - Two-phase plan: Phase 1 core sky/foreground logic first, Phase 2 decoder and
   calibration hardening ([plan](plan.md)); installs logged in [install-log](install-log.md).
+- Desktop app, all six steps (2026-10-27): Import checks a RAW folder in the background
+  (thumbnails made during the sequence check), chooses runs and frames, checks lens profile,
+  colour matrix, memory and disk before writing, and runs `process` with live progress, time
+  left, Cancel and Resume; Frames, Sky & ground (GPU overlay of the sky weight), Scene (hero
+  frame and moment made in the background and opened), Compare and Look & export (live look
+  controls, realism check, linear master / 16-bit TIFF / JPEG export) share one GPU viewer.
+  Engine: `src/progress.rs` (stage plan, step counts, cancel at the next item, time left),
+  `process` resumes from its journal (`process.json` written around every stage; the
+  interrupted stage's store files rolled back; killed twice and resumed, the final TIFF is
+  byte-identical to an uninterrupted run), named hero results, per-frame drift, lens
+  candidates and colour-matrix checks. Screens verified headlessly with kittest renders on
+  Yellowstone (a RAW folder, a finished run, a stopped run); no live window yet.
 - Desktop app start (2026-10-27): app research report, screen designs, ADR 0011 (egui on a
   shared wgpu device, LightCraft Classic's HDR-patched egui-wgpu vendored); `app/` opens a
   processed folder, store or scene file and compares two GPU-resident looks (instant swap,

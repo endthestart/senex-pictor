@@ -206,7 +206,12 @@ pub fn stack(gpu: &Gpu, inputs: &Inputs, budget: &Budget) -> Result<SkyStack> {
     // Each band's rows are held twice (as read and packed for upload) beside two bands'
     // results in flight.
     let per_row = (2 * w * 3 * OUTPUTS * 4) as u64;
-    for (b0, b1, bytes) in bands(inputs, &rotations, BAND, per_row / 2, room / 2)? {
+    let bands = bands(inputs, &rotations, BAND, per_row / 2, room / 2)?;
+    budget
+        .progress
+        .step("Stacking the sky on the GPU", bands.len());
+    for (b0, b1, bytes) in bands {
+        budget.progress.advance()?;
         let pool = budget.pool("the GPU sky stack", held + 2 * bytes, 1)?;
         let rows: Vec<Option<Rows>> = pool.install(|| {
             (0..n)

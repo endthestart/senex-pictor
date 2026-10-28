@@ -116,9 +116,10 @@ licence recorded in the reuse audit); sep, astroalign and SAM stay oracles until
 Desktop app (M4, started 2026-10-27): research report (`reports/Star Photos app research.md`),
 six screen designs (private design canvas), toolkit decided in ADR 0011 from the canvas spike
 (45 MP on an M2 Max: under 1 ms of GPU per frame, 120 Hz in a window, 5 ms look recompute,
-EDR confirmed). The app crate (`app/`) has Open and Compare; next come engine progress and
-cancel hooks for running `process` from the app, then Frames, Sky & ground, Scene, Look &
-export.
+EDR confirmed). The app crate (`app/`) has all six steps, runs `process` with progress,
+Cancel and Resume, and makes hero frames and moments; next is refining the look and feel in
+a live window with the owner, then mask corrections (brush, candidate masks), comparing two
+results side by side, and settings for the memory budget and GPU.
 
 Gate per milestone: prototype parity on Wild River, Maplewood, Northern Lights, BWCA and
 Yellowstone (registration angles within 1e-4°, matte agreement on 99.5% of pixels, stack

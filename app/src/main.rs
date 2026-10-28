@@ -1,18 +1,21 @@
 //! Star Photos desktop app (ADR 0011): egui on a wgpu device the app creates and shares with the
 //! window, so rendered looks stay on the GPU. Opens a `process` output folder or a store.
 //!
-//! star-photos-app [FOLDER] [--demo yes] [--scene FILE] [--mp 45] [--gpu NAME] [--hdr no]
+//! star-photos-app [FOLDER] [--demo yes] [--scene FILE] [--step NAME] [--mp 45] [--gpu NAME] [--hdr no]
 //! Developer runs: --bench-window SECONDS (scripted pan, zoom and swap; prints JSON),
 //! --bench-offscreen WxH (GPU times without a window), --save-scene FILE, --screenshot FILE
-//! (save the window once the comparison is up, then quit).
+//! (save the window once a result is up, then quit). FOLDER is a folder of RAW files, an output
+//! folder or a store; --step opens on import, frames, sky, scene, compare or look.
 
 use eframe::egui_wgpu::{WgpuSetup, WgpuSetupExisting};
 use star_photos::{Result, error};
-use star_photos_app::{app, bench, gpu, project, scene};
+use star_photos_app::project::{self, Kind, Loaded};
+use star_photos_app::shell::Step;
+use star_photos_app::{app, bench, gpu, scene};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-const USAGE: &str = "usage: star-photos-app [FOLDER] [--demo yes] [--scene FILE] [--mp 45] [--gpu NAME] [--hdr no] \
+const USAGE: &str = "usage: star-photos-app [FOLDER] [--demo yes] [--scene FILE] [--step NAME] [--mp 45] [--gpu NAME] [--hdr no] \
                      [--bench-window SECONDS | --bench-offscreen WxH | --save-scene FILE | --screenshot FILE]";
 
 fn options() -> Result<(Option<PathBuf>, HashMap<String, String>)> {
@@ -51,6 +54,33 @@ fn adapter(instance: &wgpu::Instance, name: Option<&String>) -> Result<wgpu::Ada
     }
 }
 
+fn step(name: &str) -> Result<Step> {
+    Step::ALL
+        .into_iter()
+        .find(|s| format!("{s:?}").eq_ignore_ascii_case(name))
+        .ok_or_else(|| {
+            error(format!(
+                "--step {name}: import, frames, sky, scene, compare or look"
+            ))
+        })
+}
+
+/// What a developer run opens without a window.
+fn loaded(folder: Option<PathBuf>, scene_file: Option<&String>) -> Result<Loaded> {
+    match (folder, scene_file) {
+        (Some(f), _) => match project::classify(&f)? {
+            Kind::Processed(out) => project::load_run(&out, None),
+            Kind::Store(dir) => project::load_store(&dir),
+            Kind::SceneFile(file) => project::load_scene_file(&file),
+            Kind::Raw(_) | Kind::Interrupted(..) => {
+                Err(error(format!("{} has no result yet", f.display())))
+            }
+        },
+        (None, Some(file)) => project::load_scene_file(Path::new(file)),
+        (None, None) => project::demo([6048, 4024]),
+    }
+}
+
 /// Developer runs without a window: save a scene file or time the GPU.
 fn headless(
     o: &HashMap<String, String>,
@@ -59,11 +89,7 @@ fn headless(
     queue: &wgpu::Queue,
     gpu: &str,
 ) -> Result<()> {
-    let p = match (folder, o.get("--scene")) {
-        (Some(f), _) => project::open(f).recv()??,
-        (None, Some(file)) => project::from_file(Path::new(file))?,
-        (None, None) => project::demo([6048, 4024]).recv()??,
-    };
+    let p = loaded(folder, o.get("--scene"))?;
     if let Some(file) = o.get("--save-scene") {
         scene::save(&p.scene, Path::new(file))?;
         eprintln!("star-photos-app: scene saved to {file}");
@@ -102,10 +128,6 @@ fn run() -> Result<()> {
     if o.contains_key("--save-scene") || o.contains_key("--bench-offscreen") {
         return headless(&o, folder, &device, &queue, &gpu_name);
     }
-    let project = o
-        .get("--scene")
-        .map(|f| project::from_file(Path::new(f)))
-        .transpose()?;
     let mut wgpu_options = eframe::NativeOptions::default().wgpu_options;
     wgpu_options.wgpu_setup = WgpuSetup::Existing(WgpuSetupExisting {
         instance,
@@ -115,8 +137,8 @@ fn run() -> Result<()> {
     });
     wgpu_options.hdr_output = o.get("--hdr").is_none_or(|v| v != "no");
     let start = app::Start {
-        folder,
-        project,
+        open: folder.or_else(|| o.get("--scene").map(PathBuf::from)),
+        step: o.get("--step").map(|s| step(s)).transpose()?,
         demo: o
             .get("--demo")
             .is_some_and(|v| v == "yes")
@@ -127,12 +149,21 @@ fn run() -> Result<()> {
         bench_seconds: o.get("--bench-window").map(|v| v.parse()).transpose()?,
         screenshot: o.get("--screenshot").map(PathBuf::from),
     };
+    let icon =
+        image::load_from_memory(include_bytes!("../assets/icon/star-photos.png"))?.into_rgba8();
+    let icon = egui::IconData {
+        width: icon.width(),
+        height: icon.height(),
+        rgba: icon.into_raw(),
+    };
     let options = eframe::NativeOptions {
         renderer: eframe::Renderer::Wgpu,
         wgpu_options,
         viewport: egui::ViewportBuilder::default()
             .with_title("Star Photos")
-            .with_inner_size([1600.0, 1000.0])
+            .with_inner_size([1440.0, 900.0])
+            .with_min_inner_size([1100.0, 700.0])
+            .with_icon(std::sync::Arc::new(icon))
             .with_drag_and_drop(true),
         ..Default::default()
     };

@@ -1,7 +1,9 @@
-//! The off-screen benchmark: the GPU time to recompute a look (with mips) and to draw the canvas
-//! into a window-sized target at fit, 100% and 200%, swapping renderings every frame. Each frame
-//! is submitted and waited for, so the times are what the GPU needs, independent of the display.
+//! The benchmarks. Off screen: the GPU time to recompute a look (with mips) and to draw the
+//! canvas into a window-sized target at fit, 100% and 200%, swapping renderings every frame;
+//! each frame is submitted and waited for, so the times are what the GPU needs, independent of
+//! the display. In the window: a scripted pan, zoom and swap with each frame's interval.
 
+use crate::app::{StarPhotos, Workspace};
 use crate::gpu::canvas::{self, CanvasGpu, View};
 use crate::gpu::look::{FORMAT, Looks};
 use crate::scene::LookParams;
@@ -94,4 +96,57 @@ pub fn run(
         "look_recompute": stats::summary(&look_times),
         "canvas_frames": phases,
     }))
+}
+
+/// A scripted run: its length, when it started, frame intervals per phase, the last frame.
+pub struct Window {
+    seconds: f64,
+    start: Instant,
+    samples: Vec<(&'static str, f64)>,
+    last: Option<Instant>,
+}
+
+impl Window {
+    pub fn new(seconds: f64) -> Window {
+        Window {
+            seconds,
+            start: Instant::now(),
+            samples: Vec::new(),
+            last: None,
+        }
+    }
+}
+
+impl StarPhotos {
+    /// Drives a scripted run once the comparison is up: records frame intervals per phase and
+    /// ends it, printing the report.
+    pub(crate) fn bench_frame(&mut self, ctx: &egui::Context) {
+        let Some(Window {
+            seconds,
+            start,
+            samples,
+            last,
+        }) = &mut self.bench
+        else {
+            return;
+        };
+        let Workspace::Open(s) = &mut self.workspace else {
+            *start = Instant::now();
+            return;
+        };
+        let now = Instant::now();
+        let t = now.duration_since(*start).as_secs_f64() / *seconds;
+        let phase = s.compare.script(&mut s.viewer, t, samples.len());
+        if let Some(prev) = last.replace(now) {
+            samples.push((phase, now.duration_since(prev).as_secs_f64()));
+        }
+        if t > 1.0 {
+            println!(
+                "{}",
+                serde_json::json!({"window": stats::by_phase(samples), "display": self.display.lines})
+            );
+            self.bench = None;
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
+    }
 }

@@ -96,7 +96,10 @@ pub fn stack(inputs: &Inputs, budget: &Budget) -> Result<SkyStack> {
         halves: [Vec::with_capacity(w * h), Vec::with_capacity(w * h)],
         clipped: Vec::with_capacity(w * h),
     };
-    for (b0, b1, bytes) in bands(inputs, &rotations, BAND, 0, room)? {
+    let bands = bands(inputs, &rotations, BAND, 0, room)?;
+    budget.progress.step("Stacking the sky", bands.len());
+    for (b0, b1, bytes) in bands {
+        budget.progress.advance()?;
         let pool = budget.pool("the sky stack", held + bytes, PIXEL_WORKER_BYTES)?;
         let rows: Vec<Option<Rows>> = pool.install(|| {
             (0..n)

@@ -30,12 +30,7 @@ pub fn flat(store: &Store, lens: Option<&str>) -> Result<(Vec<f32>, Vignetting)>
         .focal_mm
         .zip(f.aperture)
         .ok_or_else(|| error("no focal length or aperture recorded; vignetting needs them"))?;
-    let maker = m
-        .make
-        .as_deref()
-        .and_then(|s| s.split_whitespace().next())
-        .unwrap_or("");
-    let v = lens::find(&lens::database()?, maker, lens_name, focal, aperture)?;
+    let v = lens::for_camera(m.make.as_deref(), lens_name, focal, aperture)?;
     Ok((lens::field(m.width, m.height, v.k), v))
 }
 
@@ -92,6 +87,7 @@ pub fn separate(
         ],
     )?;
     let t_stats = clock.elapsed().as_secs_f64();
+    budget.progress.step("Drawing the sky and ground", 0);
     let m = matte::matte(&s, n, labels)?;
     planes::save(
         &store.dir.join("matte.planes"),

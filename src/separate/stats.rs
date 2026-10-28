@@ -61,11 +61,18 @@ pub fn temporal_stats(
     let angles = &model.angles[frames.clone()];
     let held = Budget::held(w * h);
     let pool = budget.pool("frame trends", held, TREND_BYTES_PER_PIXEL * (w * h) as u64)?;
+    budget
+        .progress
+        .step("Measuring each frame's brightness", frames.len());
     let trends: Vec<BlockGrid> = pool.install(|| {
         frames
             .clone()
             .into_par_iter()
-            .map(|i| Ok(BlockGrid::medians(&store.luminance(i)?, w, h, TREND_BLOCK)))
+            .map(|i| {
+                let grid = BlockGrid::medians(&store.luminance(i)?, w, h, TREND_BLOCK);
+                budget.progress.advance()?;
+                Ok(grid)
+            })
             .collect::<Result<_>>()
     })?;
     let velocity = sky_velocity(model, w, h);
@@ -81,10 +88,17 @@ pub fn temporal_stats(
     };
     let strip_bytes = 2 * (frames.len() * (STRIP + 2 * HALO) * w * 4) as u64;
     let pool = budget.pool("temporal statistics", held, strip_bytes)?;
+    budget
+        .progress
+        .step("Following each pixel through the night", starts.len());
     let strips: Vec<Strip> = pool.install(|| {
         starts
             .par_iter()
-            .map(|&y0| strip(&context, y0, (y0 + STRIP).min(h)))
+            .map(|&y0| {
+                let s = strip(&context, y0, (y0 + STRIP).min(h))?;
+                budget.progress.advance()?;
+                Ok(s)
+            })
             .collect::<Result<_>>()
     })?;
     let mut out = Stats {

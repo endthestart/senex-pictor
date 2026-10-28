@@ -1,20 +1,22 @@
 //! What the sequence check needs from each RAW: capture time and settings, the saturated
 //! share of the default crop, the sky level (median of the upper half) and the foreground
-//! colour (median of the lower half per colour), all from CFA samples above black, and the
-//! frame's look for motion between frames.
+//! colour (median of the lower half per colour), all from CFA samples above black, the frame's
+//! look for motion between frames and its thumbnail.
 
 use super::motion::{self, Look, Steps};
+use super::thumb::{self, Thumb};
 use crate::budget::Budget;
 use crate::calibration::Mosaic;
 use crate::stars::similarity::Random;
 use crate::store::seconds;
 use crate::{Result, error, input};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 /// Settings that must stay fixed within one run.
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Settings {
+    pub make: Option<String>,
     pub model: Option<String>,
     pub lens: Option<String>,
     pub exposure_s: Option<f64>,
@@ -23,7 +25,7 @@ pub struct Settings {
     pub focal_mm: Option<f64>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Capture {
     pub name: String,
     pub time_s: f64,
@@ -43,7 +45,7 @@ const CAPTURE_BYTES_PER_PIXEL: u64 = 40;
 /// A kept look per sensor pixel (half-resolution features).
 const LOOK_BYTES_PER_PIXEL: u64 = 1;
 
-pub fn capture(path: &Path) -> Result<(Capture, Look)> {
+pub fn capture(path: &Path) -> Result<(Capture, Look, Thumb)> {
     let (raw, identity) = input::decode(path)?;
     let mosaic = Mosaic::from_raw(&raw)?;
     let crop = raw.develop_crop(mosaic.width, mosaic.height);
@@ -78,10 +80,19 @@ pub fn capture(path: &Path) -> Result<(Capture, Look)> {
         }
     }
     let look = motion::look(&mosaic, (crop.x, crop.y, crop.width, crop.height))?;
+    let wb = raw
+        .wb_multipliers
+        .ok_or_else(|| error(format!("{}: no as-shot white balance", identity.filename)))?;
+    let thumb = thumb::make(
+        &mosaic,
+        (crop.x, crop.y, crop.width, crop.height),
+        [wb[0] / wb[1], 1.0, wb[2] / wb[1]],
+    )?;
     let capture = Capture {
         name: identity.filename,
         time_s,
         settings: Settings {
+            make: m.make.clone(),
             model: m.model.clone(),
             lens: m.lens_model.clone(),
             exposure_s: m.exposure_time,
@@ -97,7 +108,7 @@ pub fn capture(path: &Path) -> Result<(Capture, Look)> {
             median(&mut ground[2])?,
         ],
     };
-    Ok((capture, look))
+    Ok((capture, look, thumb))
 }
 
 pub fn median(values: &mut [f32]) -> Result<f64> {
@@ -109,9 +120,15 @@ pub fn median(values: &mut [f32]) -> Result<f64> {
     Ok(f64::from(*v))
 }
 
-/// `capture` for every path, as many at a time as `budget` allows, in path order, with the
-/// motion from each frame to the next.
-pub fn capture_all(paths: &[std::path::PathBuf], budget: &Budget) -> Result<(Vec<Capture>, Steps)> {
+/// Every frame's capture, the motion from each frame to the next, and every thumbnail.
+pub struct Captured {
+    pub captures: Vec<Capture>,
+    pub steps: Steps,
+    pub thumbs: Vec<Thumb>,
+}
+
+/// `capture` for every path, as many at a time as `budget` allows, in path order.
+pub fn capture_all(paths: &[std::path::PathBuf], budget: &Budget) -> Result<Captured> {
     use rayon::prelude::*;
     let first = paths.first().ok_or_else(|| error("no RAW files"))?;
     let [w, h] = input::inspect(first)?.sensor;
@@ -121,17 +138,28 @@ pub fn capture_all(paths: &[std::path::PathBuf], budget: &Budget) -> Result<(Vec
         2 * CHUNK as u64 * LOOK_BYTES_PER_PIXEL * pixels,
         CAPTURE_BYTES_PER_PIXEL * pixels,
     )?;
+    budget.progress.step("Reading frames", paths.len());
     pool.install(|| {
         let mut captures = Vec::with_capacity(paths.len());
+        let mut thumbs = Vec::with_capacity(paths.len());
         let mut steps = Steps::default();
         let mut previous: Option<Look> = None;
         for chunk in paths.chunks(CHUNK) {
-            let (caps, mut looks): (Vec<Capture>, Vec<Look>) = chunk
+            let read: Vec<(Capture, Look, Thumb)> = chunk
                 .par_iter()
-                .map(|p| capture(p))
-                .collect::<Result<Vec<_>>>()?
-                .into_iter()
-                .unzip();
+                .map(|p| {
+                    let c = capture(p)?;
+                    budget.progress.advance()?;
+                    Ok(c)
+                })
+                .collect::<Result<_>>()?;
+            let mut caps = Vec::with_capacity(read.len());
+            let mut looks = Vec::with_capacity(read.len());
+            for (c, l, t) in read {
+                caps.push(c);
+                looks.push(l);
+                thumbs.push(t);
+            }
             if previous.is_none() {
                 steps.foreground.push(None);
                 steps.sky.push(None);
@@ -156,6 +184,10 @@ pub fn capture_all(paths: &[std::path::PathBuf], budget: &Budget) -> Result<(Vec
             captures.extend(caps);
             previous = looks.pop();
         }
-        Ok((captures, steps))
+        Ok(Captured {
+            captures,
+            steps,
+            thumbs,
+        })
     })
 }

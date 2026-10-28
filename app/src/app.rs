@@ -1,26 +1,31 @@
-//! The window: open a processed folder (button, drag and drop, or the command line) or the demo
-//! scene, wait while it is prepared in the background, then compare. The step list shows only
-//! the steps that exist so far.
+//! The window: the header, the step list and the status line around the current step's
+//! screen. A RAW folder goes through Import (checked, chosen, processed); a processed folder,
+//! a store, a scene file or the demo scene is prepared in the background and opens on Compare,
+//! the hub every step returns to.
 
-use crate::compare::Compare;
 use crate::display::Display;
-use crate::project::{self, Project};
-use crate::stats;
+use crate::import::Import;
+use crate::job::Job;
+use crate::project::{self, Loaded};
+use crate::session::Session;
+use crate::shell::{self, Step};
+use crate::{rows, welcome};
 use std::path::PathBuf;
-use std::sync::mpsc::Receiver;
-use std::time::Instant;
 
-enum Screen {
-    Open,
-    Loading(String, Receiver<star_photos::Result<Project>>),
-    Compare(Box<Compare>),
+pub(crate) enum Workspace {
+    Empty,
+    Import(Box<Import>),
+    Loading(Job<Loaded>),
+    Open(Box<Session>),
 }
 
 pub struct Start {
-    pub folder: Option<PathBuf>,
-    pub project: Option<Project>,
+    /// A folder or file to open.
+    pub open: Option<PathBuf>,
     /// The synthetic demo scene at this size.
     pub demo: Option<[u32; 2]>,
+    /// The step to show once something is open.
+    pub step: Option<Step>,
     /// Render at this many megapixels instead of the scene's own size.
     pub mp: Option<f64>,
     pub gpu_name: String,
@@ -30,20 +35,19 @@ pub struct Start {
 }
 
 pub struct StarPhotos {
-    screen: Screen,
-    display: Display,
-    mp: Option<f64>,
-    error: Option<String>,
-    bench: Option<Bench>,
+    pub(crate) workspace: Workspace,
+    pub(crate) step: Step,
+    /// The step to show once the next result opens.
+    pub(crate) next: Step,
+    pub(crate) display: Display,
+    /// What the window title names.
+    title: String,
+    /// The header's chips: the memory budget and the GPU.
+    pub(crate) chips: Vec<String>,
+    pub(crate) mp: Option<f64>,
+    pub(crate) error: Option<String>,
+    pub(crate) bench: Option<crate::bench::Window>,
     shot: Option<crate::shot::Shot>,
-}
-
-/// A scripted run: its length, when it started, frame intervals per phase, the last frame.
-struct Bench {
-    seconds: f64,
-    start: Instant,
-    samples: Vec<(&'static str, f64)>,
-    last: Option<Instant>,
 }
 
 impl StarPhotos {
@@ -59,121 +63,106 @@ impl StarPhotos {
                 lines: vec!["the window did not start with wgpu".into()],
             },
         };
+        let memory = match star_photos::budget::Budget::from_free() {
+            Ok(b) => format!("Memory {} budget", crate::widgets::bytes(b.bytes as f64)),
+            Err(_) => "Memory unknown".into(),
+        };
+        let gpu = s
+            .gpu_name
+            .split(" (")
+            .next()
+            .unwrap_or(&s.gpu_name)
+            .to_string();
         let mut app = StarPhotos {
-            screen: Screen::Open,
+            workspace: Workspace::Empty,
+            step: Step::Import,
+            next: s.step.unwrap_or(Step::Compare),
+            chips: vec![memory, gpu],
+            title: String::new(),
             display,
             mp: s.mp,
             error: None,
             shot: s.screenshot.map(crate::shot::Shot::new),
-            bench: s.bench_seconds.map(|seconds| Bench {
-                seconds,
-                start: Instant::now(),
-                samples: Vec::new(),
-                last: None,
-            }),
+            bench: s.bench_seconds.map(crate::bench::Window::new),
         };
-        match (rs, s.project, s.folder, s.demo) {
-            (None, ..) => app.fail("the window did not start with wgpu".into()),
-            (Some(rs), Some(p), ..) => app.show(rs, p),
-            (Some(_), None, Some(folder), _) => {
-                app.screen = Screen::Loading(folder.display().to_string(), project::open(folder));
-            }
-            (Some(_), None, None, Some(size)) => {
-                app.screen = Screen::Loading("the demo scene".into(), project::demo(size));
-            }
-            (Some(_), None, None, None) => {}
+        if rs.is_none() {
+            app.error = Some("the window did not start with wgpu".into());
+        } else if let Some(path) = s.open {
+            app.open(path);
+        } else if let Some(size) = s.demo {
+            app.load(Job::start("Making the demo scene", move |_| {
+                project::demo(size)
+            }));
+        }
+        if let (Some(step), Workspace::Import(_)) = (s.step, &app.workspace) {
+            app.step = step;
         }
         app
     }
 
+    /// Shows `step` (as a click in the step list would).
+    pub fn show_step(&mut self, step: Step) {
+        self.step = step;
+    }
+
+    /// Whether a result is open (on any step).
+    pub fn opened(&self) -> bool {
+        matches!(self.workspace, Workspace::Open(_))
+    }
+
     /// Whether the Compare screen is up.
     pub fn comparing(&self) -> bool {
-        matches!(self.screen, Screen::Compare(_))
+        self.opened() && self.step == Step::Compare
     }
 
-    fn show(&mut self, rs: &eframe::egui_wgpu::RenderState, p: Project) {
-        let name = p.name.clone();
-        match Compare::new(rs, self.display.clone(), p, self.mp) {
-            Ok(c) => {
-                eprintln!("star-photos-app: opened {name}");
-                self.screen = Screen::Compare(Box::new(c));
-            }
-            Err(e) => self.fail(e.to_string()),
+    /// Whether nothing is being checked, processed or prepared.
+    pub fn idle(&self) -> bool {
+        match &self.workspace {
+            Workspace::Import(i) => !i.checking() && !i.processing(),
+            Workspace::Loading(_) => false,
+            Workspace::Open(s) => !s.busy(),
+            Workspace::Empty => true,
         }
     }
 
-    /// Back to the open screen with `message`, also on stderr for terminal launches.
-    fn fail(&mut self, message: String) {
-        eprintln!("star-photos-app: {message}");
-        self.error = Some(message);
-        self.screen = Screen::Open;
-    }
-
-    fn open_screen(&mut self, ui: &mut egui::Ui) {
-        ui.vertical_centered(|ui| {
-            ui.add_space(ui.available_height() * 0.3);
-            ui.heading("Star Photos");
-            ui.label(
-                "Open a folder made by star-photos process (or a store) to compare its looks.",
-            );
-            ui.add_space(12.0);
-            if ui.button("Open a processed folder…").clicked()
-                && let Some(folder) = rfd::FileDialog::new().pick_folder()
-            {
-                self.screen = Screen::Loading(folder.display().to_string(), project::open(folder));
+    fn screen(&mut self, ui: &mut egui::Ui) {
+        let ctx = ui.ctx().clone();
+        let mut action = None;
+        match (&mut self.workspace, self.step) {
+            (Workspace::Empty, _) => {
+                egui::CentralPanel::default().show(ui, |ui| {
+                    action = welcome::show(ui, self.error.as_deref());
+                });
             }
-            if ui.button("Open a scene file…").clicked()
-                && let Some(file) = rfd::FileDialog::new()
-                    .add_filter("scene", &["scene"])
-                    .pick_file()
-            {
-                self.screen = Screen::Loading(file.display().to_string(), project::open(file));
+            (Workspace::Loading(job), _) => {
+                let label = job.label.clone();
+                egui::CentralPanel::default().show(ui, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(ui.available_height() * 0.4);
+                        ui.spinner();
+                        ui.label(format!("{label}…"));
+                    });
+                });
             }
-            if ui.button("Show the demo scene").clicked() {
-                self.screen = Screen::Loading("the demo scene".into(), project::demo([6048, 4024]));
+            (Workspace::Import(i), _) => {
+                egui::CentralPanel::default()
+                    .frame(egui::Frame::NONE.inner_margin(egui::Margin::symmetric(28, 24)))
+                    .show(ui, |ui| {
+                        egui::ScrollArea::vertical()
+                            .auto_shrink([false, false])
+                            .show(ui, |ui| i.show(ui));
+                    });
             }
-            ui.weak("You can also drop a folder or a .scene file on the window.");
-            if let Some(e) = &self.error {
-                ui.colored_label(egui::Color32::LIGHT_RED, e);
-            }
-        });
-        let dropped = ui
-            .ctx()
-            .input(|i| i.raw.dropped_files.first().map(|f| f.path().to_path_buf()));
-        if let Some(folder) = dropped {
-            self.screen = Screen::Loading(folder.display().to_string(), project::open(folder));
+            (Workspace::Open(s), step) => crate::screens::show(ui, &ctx, s, step),
         }
-    }
-
-    /// Drives a scripted run once the comparison is up: records frame intervals per phase and
-    /// ends it, printing the report.
-    fn bench_frame(&mut self, ctx: &egui::Context) {
-        let Some(Bench {
-            seconds,
-            start,
-            samples,
-            last,
-        }) = &mut self.bench
-        else {
-            return;
-        };
-        let Screen::Compare(c) = &mut self.screen else {
-            *start = Instant::now();
-            return;
-        };
-        let now = Instant::now();
-        let t = now.duration_since(*start).as_secs_f64() / *seconds;
-        let phase = c.script(t, samples.len());
-        if let Some(prev) = last.replace(now) {
-            samples.push((phase, now.duration_since(prev).as_secs_f64()));
-        }
-        if t > 1.0 {
-            println!(
-                "{}",
-                serde_json::json!({"window": stats::by_phase(samples), "display": self.display.lines})
-            );
-            self.bench = None;
-            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        match action {
+            Some(welcome::Action::Open(path)) => self.open(path),
+            Some(welcome::Action::Demo) => {
+                self.load(Job::start("Making the demo scene", |_| {
+                    project::demo([6048, 4024])
+                }));
+            }
+            None => {}
         }
     }
 }
@@ -181,76 +170,76 @@ impl StarPhotos {
 impl eframe::App for StarPhotos {
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
-        if let Screen::Loading(_, rx) = &self.screen
-            && let Ok(result) = rx.try_recv()
-        {
-            match (result, frame.wgpu_render_state()) {
-                (Ok(p), Some(rs)) => self.show(&rs.clone(), p),
-                (Err(e), _) => self.fail(e.to_string()),
-                (Ok(_), None) => self.fail("the window has no GPU renderer".into()),
-            }
-        }
+        self.poll(frame);
         self.bench_frame(&ctx);
-        let mut back = false;
-        egui::Panel::left("steps").min_size(280.0).show(ui, |ui| {
-            ui.heading("Star Photos");
-            ui.separator();
-            let open = matches!(self.screen, Screen::Open | Screen::Loading(..));
-            if ui.selectable_label(open, "1  Open").clicked() {
-                back = true;
-            }
-            let _ = ui.selectable_label(!open, "2  Compare");
-            ui.separator();
-            if let Screen::Compare(c) = &mut self.screen {
-                ui.strong(&c.name);
-                for f in &c.facts {
-                    ui.weak(f);
-                }
-                ui.separator();
-                c.looks_panel(ui);
-                if let Some(e) = &c.error {
-                    ui.colored_label(egui::Color32::LIGHT_RED, e);
-                }
+        if self.opened()
+            && let Some(shot) = &mut self.shot
+            && shot.frame(&ctx)
+        {
+            self.shot = None;
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
+        let (name, chips) = rows::header(self);
+        if name != self.title {
+            let title = if name.is_empty() {
+                "Star Photos".to_string()
             } else {
-                for line in &self.display.lines {
-                    ui.weak(line);
-                }
-            }
+                format!("{name} — Star Photos")
+            };
+            ctx.send_viewport_cmd(egui::ViewportCommand::Title(title));
+            self.title = name.clone();
+        }
+        egui::Panel::top("header")
+            .frame(egui::Frame::NONE)
+            .show(ui, |ui| shell::header(ui, &name, &chips));
+        let (icon, status) = rows::status(self);
+        egui::Panel::bottom("status")
+            .frame(egui::Frame::NONE)
+            .show(ui, |ui| shell::footer(ui, icon, &status));
+        let steps = rows::steps(self);
+        let pressed = ctx.input(|i| {
+            let keys = [
+                egui::Key::Num1,
+                egui::Key::Num2,
+                egui::Key::Num3,
+                egui::Key::Num4,
+                egui::Key::Num5,
+                egui::Key::Num6,
+            ];
+            keys.iter()
+                .position(|k| i.modifiers.command && i.key_pressed(*k))
         });
-        if back {
-            self.screen = Screen::Open;
+        if let Some(row) = pressed.and_then(|k| steps.get(k))
+            && row.state != shell::State::Unavailable
+        {
+            self.step = row.step;
         }
-        match &mut self.screen {
-            Screen::Open => {
-                egui::CentralPanel::default().show(ui, |ui| self.open_screen(ui));
-            }
-            Screen::Loading(what, _) => {
-                let what = what.clone();
-                egui::CentralPanel::default().show(ui, |ui| {
-                    ui.vertical_centered(|ui| {
-                        ui.add_space(ui.available_height() * 0.4);
-                        ui.spinner();
-                        ui.label(format!("Preparing {what}…"));
-                    });
-                });
-            }
-            Screen::Compare(c) => {
-                if let Some(shot) = &mut self.shot
-                    && shot.frame(&ctx)
-                {
-                    self.shot = None;
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        egui::Panel::left("steps")
+            .exact_size(240.0)
+            .resizable(false)
+            .frame(
+                egui::Frame::NONE
+                    .fill(crate::theme::CHROME)
+                    .inner_margin(egui::Margin::symmetric(12, 12)),
+            )
+            .show(ui, |ui| {
+                if let Some(step) = shell::rail(ui, &steps, self.step) {
+                    self.step = step;
                 }
-                c.keys(&ctx);
-                egui::Panel::right("regions")
-                    .min_size(340.0)
-                    .show(ui, |ui| c.regions_panel(ui));
-                egui::CentralPanel::default()
-                    .frame(egui::Frame::NONE)
-                    .show(ui, |ui| c.canvas(ui));
-            }
-        }
-        if matches!(self.screen, Screen::Loading(..)) {
+                let busy = !self.idle() || matches!(self.workspace, Workspace::Empty);
+                if !busy {
+                    ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+                        if ui.link("Open another folder…").clicked()
+                            && let Some(dir) = rfd::FileDialog::new().pick_folder()
+                        {
+                            self.open(dir);
+                        }
+                    });
+                }
+            });
+        self.screen(ui);
+        let busy = !self.idle() || self.bench.is_some();
+        if busy {
             ctx.request_repaint_after(std::time::Duration::from_millis(100));
         }
         if self.bench.is_some() {

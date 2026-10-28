@@ -73,11 +73,25 @@ fn star_layer(plane: &[f32], w: usize, h: usize, k: f32) -> Vec<f32> {
 
 /// Writes `moment-{centre name}.planes`: alpha·(starless window median + deep stars) +
 /// (1 − alpha)·ground.
+/// Whether the store holds the whole-sequence stack a moment is made from (a drifting run is
+/// composed around one frame instead and has none).
+pub fn possible(store: &Store) -> bool {
+    ["sky.planes", "ground.planes"]
+        .iter()
+        .all(|f| store.dir.join(f).exists())
+}
+
 pub fn moment(store: &Store, centre: usize, half: usize, budget: &Budget) -> Result<Report> {
     let m = &store.manifest;
     let (w, h, n) = (m.width, m.height, m.frames.len());
     if centre >= n {
         return Err(error("moment: centre frame outside the store"));
+    }
+    if !possible(store) {
+        return Err(error(
+            "a moment needs the whole-sequence stack (sky.planes and ground.planes); this \
+             store has none (run the stack stage, or the run was composed around one frame)",
+        ));
     }
     let flat = super::recorded_flat(store)?;
     let alpha = planes::load(&store.dir.join("matte.planes"))?;
@@ -91,10 +105,12 @@ pub fn moment(store: &Store, centre: usize, half: usize, budget: &Budget) -> Res
     let pixels = (w * h) as u64;
     let held = Budget::held(w * h) + 12 * window.len() as u64 * pixels;
     let pool = budget.pool("the moment", held, CHANNEL_BYTES_PER_PIXEL * pixels)?;
+    budget.progress.step("Building the moment", 3);
     let channels: Vec<Vec<f32>> = pool.install(|| {
         (0..3usize)
             .into_par_iter()
             .map(|k| -> Result<Vec<f32>> {
+                budget.progress.advance()?;
                 let mut buf = vec![0f32; window.len()];
                 let still: Vec<f32> = (0..w * h)
                     .map(|p| {

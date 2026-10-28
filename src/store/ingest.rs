@@ -27,12 +27,17 @@ pub fn ingest(paths: &[PathBuf], dir: &Path, budget: &Budget) -> Result<Store> {
     let first = paths.first().ok_or_else(|| error("no frames to ingest"))?;
     let [w, h] = input::inspect(first)?.sensor;
     let pool = budget.pool("ingest", 0, DEVELOP_BYTES_PER_PIXEL * (w * h) as u64)?;
+    budget.progress.step("Developing frames", paths.len());
     let results: Vec<Result<(FrameInfo, Manifest)>> = pool.install(|| {
         use rayon::prelude::*;
         paths
             .par_iter()
             .enumerate()
-            .map(|(i, path)| frame(path, dir, i))
+            .map(|(i, path)| {
+                let f = frame(path, dir, i)?;
+                budget.progress.advance()?;
+                Ok(f)
+            })
             .collect()
     });
     let mut manifest: Option<Manifest> = None;

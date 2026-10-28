@@ -9,6 +9,7 @@ pub mod lens;
 pub mod output;
 pub mod pipeline;
 pub mod process;
+pub mod progress;
 pub mod register;
 pub mod render;
 pub mod review;

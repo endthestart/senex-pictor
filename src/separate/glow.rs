@@ -59,10 +59,14 @@ pub fn block_medians(
         Budget::held(w * h) + MEMBER_BYTES_PER_PIXEL * (w * h) as u64,
         FRAME_BYTES_PER_PIXEL * (w * h) as u64,
     )?;
+    budget
+        .progress
+        .step("Measuring glow", store.manifest.frames.len());
     let grids = pool.install(|| {
         (0..store.manifest.frames.len())
             .into_par_iter()
             .map(|i| {
+                budget.progress.advance()?;
                 let rgb = store.rgb_rows(i, 0, h)?;
                 let masked = match exclude {
                     Some(kind) => Some(store.bit_rows(kind, i, 0, h)?),

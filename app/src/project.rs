@@ -1,75 +1,111 @@
-//! Opening work: a `process` output folder (its `process.json` says which composite it made) or a
-//! store, prepared into a scene on a background thread so the window keeps drawing; or the
-//! synthetic demo scene.
+//! What a folder or file the user opens holds, and loading a result for the viewer: a folder
+//! of RAW files (to check and process), an output folder whose run stopped (to resume), a
+//! processed output folder or a bare store (to review), or a scene file (to view elsewhere).
 
 use crate::scene::{self, Scene};
 use crate::synthetic;
-use star_photos::{Result, error};
+use star_photos::process::Report;
+use star_photos::sequence::Survey;
+use star_photos::store::Store;
+use star_photos::{Result, error, input};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{Receiver, channel};
 
-pub struct Project {
-    pub name: String,
-    /// Where comparisons are saved; none for the demo scene.
-    pub dir: Option<PathBuf>,
-    pub scene: Scene,
-    pub facts: Vec<String>,
+pub enum Kind {
+    Raw(PathBuf),
+    /// An output folder and the report of its unfinished run.
+    Interrupted(PathBuf, Box<Report>),
+    Processed(PathBuf),
+    Store(PathBuf),
+    SceneFile(PathBuf),
 }
 
-/// The store, the planes to show, and facts about the folder.
-fn resolve(folder: &Path) -> Result<(PathBuf, &'static str, Vec<String>)> {
-    let report = folder.join("process.json");
-    if report.exists() {
-        let r: serde_json::Value = serde_json::from_slice(&std::fs::read(&report)?)?;
-        let stages: Vec<&str> = r["stages"]
-            .as_array()
-            .map(|s| s.iter().filter_map(|x| x["name"].as_str()).collect())
-            .unwrap_or_default();
-        let around = stages
-            .iter()
-            .any(|s| *s == "hero" || *s == "composite around the reference");
-        let mut facts = vec![format!("{} frames", r["frames"])];
-        if let (Some(a), Some(b)) = (r["first"].as_str(), r["last"].as_str()) {
-            facts.push(format!("{a} to {b}"));
-        }
-        facts.push(
-            if around {
-                "composite around one frame"
-            } else {
-                "whole-sequence stack"
-            }
-            .into(),
-        );
-        return Ok((
-            folder.join("store"),
-            if around { "hero" } else { "final" },
-            facts,
-        ));
-    }
-    if folder.join("manifest.json").exists() {
-        let planes = if folder.join("final.planes").exists() {
-            "final"
-        } else if folder.join("hero.planes").exists() {
-            "hero"
+pub fn classify(path: &Path) -> Result<Kind> {
+    if path.is_file() {
+        return if path.extension().is_some_and(|x| x == "scene") {
+            Ok(Kind::SceneFile(path.into()))
         } else {
-            return Err(error(
-                "this store has no stacked result yet; run process or stack first",
-            ));
+            Err(error(format!(
+                "{} is a file; open a folder of RAW files, an output folder or a .scene file",
+                path.display()
+            )))
         };
-        return Ok((
-            folder.to_path_buf(),
-            planes,
-            vec![format!("store, {planes} result")],
-        ));
+    }
+    if let Some(report) = Report::load(path).map_err(|e| {
+        error(format!(
+            "{}: its process.json is from another version of Star Photos ({e}); process the \
+             RAW folder again",
+            path.display()
+        ))
+    })? {
+        return Ok(if report.complete {
+            Kind::Processed(path.into())
+        } else {
+            Kind::Interrupted(path.into(), Box::new(report))
+        });
+    }
+    if path.join("manifest.json").exists() {
+        return Ok(Kind::Store(path.into()));
+    }
+    if !input::raw_files(path)?.is_empty() {
+        return Ok(Kind::Raw(path.into()));
     }
     Err(error(format!(
-        "{} is not a Star Photos folder (no process.json or manifest.json)",
-        folder.display()
+        "{} holds no RAW files and no Star Photos results",
+        path.display()
     )))
 }
 
-fn name(folder: &Path) -> String {
-    let parts: Vec<String> = folder
+/// A processed output folder: its report, the sequence check and the store.
+pub struct Run {
+    pub out: PathBuf,
+    pub report: Report,
+    pub survey: Survey,
+    pub store: Store,
+}
+
+impl Run {
+    pub fn open(out: &Path) -> Result<Run> {
+        let report = Report::load(out)?
+            .ok_or_else(|| error(format!("{} has no process.json", out.display())))?;
+        Ok(Run {
+            out: out.into(),
+            survey: Survey::load(out)?,
+            store: Store::open(&out.join("store"))?,
+            report,
+        })
+    }
+
+    /// Results in the store: `final`, `hero`, `hero-…`, `moment-…`.
+    pub fn results(&self) -> Result<Vec<String>> {
+        let mut names: Vec<String> = std::fs::read_dir(&self.store.dir)?
+            .filter_map(|e| e.ok())
+            .filter_map(|e| {
+                let name = e.file_name().to_string_lossy().into_owned();
+                let stem = name.strip_suffix(".planes")?.to_string();
+                let result = stem == "final"
+                    || stem == "hero"
+                    || stem.starts_with("hero-")
+                    || stem.starts_with("moment-");
+                result.then_some(stem)
+            })
+            .collect();
+        names.sort();
+        Ok(names)
+    }
+}
+
+/// What the viewer opens: a result's scene, with the run it came from when there is one.
+pub struct Loaded {
+    pub name: String,
+    pub run: Option<Run>,
+    /// The result's planes name in the store, when it comes from one.
+    pub result: Option<String>,
+    pub scene: Scene,
+}
+
+/// "maplewood-2025-09-26 / process / final": the last three parts of `path`.
+pub fn name(path: &Path) -> String {
+    let parts: Vec<String> = path
         .components()
         .rev()
         .take(3)
@@ -78,48 +114,55 @@ fn name(folder: &Path) -> String {
     parts.into_iter().rev().collect::<Vec<_>>().join(" / ")
 }
 
-/// Prepares `folder` (or a scene file) on a background thread.
-pub fn open(folder: PathBuf) -> Receiver<Result<Project>> {
-    let (tx, rx) = channel();
-    std::thread::spawn(move || {
-        if folder.is_file() {
-            let _ = tx.send(from_file(&folder));
-            return;
-        }
-        let project = resolve(&folder).and_then(|(store, planes, facts)| {
-            Ok(Project {
-                name: name(&folder),
-                dir: Some(folder.clone()),
-                scene: scene::load(&store, planes)?,
-                facts,
-            })
-        });
-        let _ = tx.send(project);
-    });
-    rx
+/// A processed folder's result `result` (its own when none is given).
+pub fn load_run(out: &Path, result: Option<String>) -> Result<Loaded> {
+    let run = Run::open(out)?;
+    let result = match result.or_else(|| run.report.result.clone()) {
+        Some(r) => r,
+        None => return Err(error(format!("{} names no result", out.display()))),
+    };
+    let scene = scene::load(&run.store.dir, &result)?;
+    Ok(Loaded {
+        name: name(out),
+        run: Some(run),
+        result: Some(result),
+        scene,
+    })
 }
 
-/// The synthetic demo scene at `size`, prepared on a background thread.
-pub fn demo(size: [u32; 2]) -> Receiver<Result<Project>> {
-    let (tx, rx) = channel();
-    std::thread::spawn(move || {
-        let project = synthetic::scene(size[0], size[1]).map(|scene| Project {
-            name: "Demo scene (synthetic)".into(),
-            dir: None,
-            scene,
-            facts: vec!["generated: stars, Milky Way, treeline".into()],
-        });
-        let _ = tx.send(project);
-    });
-    rx
+/// A bare store's stacked result.
+pub fn load_store(dir: &Path) -> Result<Loaded> {
+    let planes = if dir.join("final.planes").exists() {
+        "final"
+    } else if dir.join("hero.planes").exists() {
+        "hero"
+    } else {
+        return Err(error(
+            "this store has no stacked result yet; run process or stack first",
+        ));
+    };
+    Ok(Loaded {
+        name: name(dir),
+        run: None,
+        result: Some(planes.into()),
+        scene: scene::load(dir, planes)?,
+    })
 }
 
-/// A scene file, wrapped as a project.
-pub fn from_file(path: &Path) -> Result<Project> {
-    Ok(Project {
+pub fn load_scene_file(path: &Path) -> Result<Loaded> {
+    Ok(Loaded {
         name: name(path),
-        dir: None,
+        run: None,
+        result: None,
         scene: scene::open(path)?,
-        facts: vec!["scene file".into()],
+    })
+}
+
+pub fn demo(size: [u32; 2]) -> Result<Loaded> {
+    Ok(Loaded {
+        name: "Demo scene (synthetic)".into(),
+        run: None,
+        result: None,
+        scene: synthetic::scene(size[0], size[1])?,
     })
 }

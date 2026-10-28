@@ -38,6 +38,7 @@ impl View {
 }
 
 pub const MODE_ENCODE: u32 = 1;
+pub const MODE_OVERLAY: u32 = 2;
 
 pub struct CanvasGpu {
     pipeline: wgpu::RenderPipeline,

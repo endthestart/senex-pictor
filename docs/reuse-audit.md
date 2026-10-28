@@ -42,11 +42,14 @@ and D700, read from LibRaw's table through the rawpy oracle. The desktop app
 (`app/`) uses eframe/egui 0.36 (MIT/Apache-2.0) with `vendor/egui-wgpu`: egui-wgpu
 0.36.2 (MIT OR Apache-2.0) copied from LightCraft Classic's vendor folder with its HDR display
 patch (an `Rgba16Float` extended-linear-sRGB surface and egui drawn at SDR white), wired in through
-`[patch.crates-io]`; licence texts are in that folder.
+`[patch.crates-io]`; licence texts are in that folder. The app's typeface is Inter 4
+(Regular and SemiBold, SIL OFL 1.1) copied from LightCraft's `assets/fonts/` with its licence
+(`app/assets/fonts/OFL-Inter.txt`; SHA-256 40d692fc… Regular, 78a843fa… SemiBold). The app
+reads treatment previews with `image` 0.25 (MIT/Apache-2.0, JPEG decoding only).
 
 Source files are copied verbatim from the pinned upstream commit. The subset workspace
 Cargo.toml is adapted to expose only these crates and their dependency declarations.
-No UI, profiles, fonts or image assets are adopted. The upstream brand config is
+No UI, profiles or image assets are adopted from Classic. The upstream brand config is
 retained solely to satisfy upstream constants; this does not name the new product.
 
 ## Refresh 6f48dbd → dbe90dc (adopted)

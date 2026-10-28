@@ -80,12 +80,16 @@ pub fn stack(
     }
     let each = (sources.len() * STRIP * w * BYTES_PER_SAMPLE) as u64;
     let pool = budget.pool("the ground stack", Budget::held(w * h), each)?;
+    budget
+        .progress
+        .step("Stacking the foreground", h.div_ceil(STRIP));
     let strips: Vec<Vec<([f32; 3], u32, u32)>> = pool.install(|| {
         (0..h)
             .step_by(STRIP)
             .collect::<Vec<_>>()
             .par_iter()
             .map(|&y0| {
+                budget.progress.advance()?;
                 strip(
                     store,
                     flat,
@@ -242,12 +246,17 @@ pub fn median_of(
     }
     let each = (k * STRIP * w * BYTES_PER_SAMPLE) as u64;
     let pool = budget.pool("the window median", Budget::held(w * h), each)?;
+    budget.progress.step(
+        "Stacking the foreground around one frame",
+        h.div_ceil(STRIP),
+    );
     let strips: Vec<Vec<[f32; 3]>> = pool.install(|| {
         (0..h)
             .step_by(STRIP)
             .collect::<Vec<_>>()
             .par_iter()
             .map(|&y0| {
+                budget.progress.advance()?;
                 let y1 = (y0 + STRIP).min(h);
                 let rows: Vec<Vec<f32>> = range
                     .clone()

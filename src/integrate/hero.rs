@@ -61,6 +61,9 @@ pub struct Options<'a> {
     pub lens: Option<&'a str>,
     pub kernel: Kernel,
     pub gpu: Option<&'a crate::gpu::Gpu>,
+    /// The result's name in the store (`{name}.planes`, `{name}.json`): `hero`, or
+    /// `hero-{frame}` for one of several.
+    pub name: &'a str,
 }
 
 pub fn hero(store: &Store, o: &Options, budget: &Budget) -> Result<Report> {
@@ -72,6 +75,7 @@ pub fn hero(store: &Store, o: &Options, budget: &Budget) -> Result<Report> {
         lens,
         kernel,
         gpu,
+        name,
     } = *o;
     let m = &store.manifest;
     let (w, h, n) = (m.width, m.height, m.frames.len());
@@ -193,7 +197,7 @@ pub fn hero(store: &Store, o: &Options, budget: &Budget) -> Result<Report> {
         .collect();
     let channel = |v: &[[f32; 3]], k: usize| v.iter().map(|c| c[k]).collect::<Vec<f32>>();
     planes::save(
-        &store.dir.join("hero.planes"),
+        &store.dir.join(format!("{name}.planes")),
         w,
         h,
         &[
@@ -235,7 +239,7 @@ pub fn hero(store: &Store, o: &Options, budget: &Budget) -> Result<Report> {
         seconds: clock.elapsed().as_secs_f64(),
     };
     std::fs::write(
-        store.dir.join("hero.json"),
+        store.dir.join(format!("{name}.json")),
         serde_json::to_vec_pretty(&report)?,
     )?;
     Ok(report)

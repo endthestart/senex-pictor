@@ -1,6 +1,7 @@
 //! The scene the looks are applied to: a stored result prepared by the review renderer, as
 //! linear sRGB divided by sensor white with the sky weight in alpha, the sky-weighted glow
-//! the same way, and each look's levels measured on the CPU exactly as the renderer does.
+//! the same way, the clear sky the levels are measured on, and each look's levels measured on
+//! the CPU as the renderer does.
 
 use half::f16;
 use star_photos::render::{self, Look};
@@ -56,8 +57,32 @@ pub struct Scene {
     pub base: Vec<u16>,
     /// RGBA half floats: sky weight × glow, linear sRGB / white.
     pub glow: Vec<u16>,
+    /// Sensor white the planes are divided by.
+    pub white: f32,
+    /// Clear sky without transient light, where levels are measured.
+    pub clear: Vec<bool>,
     pub looks: [LookParams; 2],
     pub names: [&'static str; 2],
+}
+
+/// `look`'s parameters for `scene`, its levels measured over the clear sky as the renderer
+/// measures them (from the half-float planes, so within their precision).
+pub fn params(scene: &Scene, look: &Look) -> Result<LookParams> {
+    let at = |plane: &[u16], p: usize, k: usize| f16::from_bits(plane[4 * p + k]).to_f32();
+    let shown: Vec<[f32; 3]> = (0..scene.clear.len())
+        .map(|p| {
+            std::array::from_fn(|k| {
+                let glow = if look.remove_glow {
+                    at(&scene.glow, p, k)
+                } else {
+                    0.0
+                };
+                (at(&scene.base, p, k) - glow) * scene.white
+            })
+        })
+        .collect();
+    let (black, scale) = render::levels(&shown, &scene.clear, look)?;
+    Ok(LookParams::of(look, black, scale, scene.white))
 }
 
 fn halves(rgb: &[[f32; 3]], fourth: impl Fn(usize) -> f32, white: f32) -> Vec<u16> {
@@ -99,6 +124,8 @@ pub fn assemble(
         height,
         base: halves(base, |q| alpha[q], white),
         glow: halves(glow, |_| 1.0, white),
+        white,
+        clear: clear.to_vec(),
         looks: [natural?, dark?],
         names: ["natural", "dark"],
     })
@@ -143,21 +170,24 @@ pub fn output_size(scene: &Scene, mp: Option<f64>) -> [u32; 2] {
     }
 }
 
-const MAGIC: &[u8; 8] = b"SPSCENE1";
+const MAGIC: &[u8; 8] = b"SPSCENE2";
 
-/// Writes the scene to `path`: magic, width, height, both looks, then the two RGBA half-float
-/// planes (little-endian), so it can be viewed on a machine without the store.
+/// Writes the scene to `path`: magic, width, height, white, both looks, the two RGBA
+/// half-float planes (little-endian) and the clear sky as bytes, so it can be viewed on a
+/// machine without the store.
 pub fn save(scene: &Scene, path: &Path) -> Result<()> {
-    let mut bytes = Vec::with_capacity(16 + 2 * 48 + 4 * (scene.base.len() + scene.glow.len()));
+    let mut bytes = Vec::with_capacity(20 + 2 * 48 + 4 * (scene.base.len() + scene.glow.len()));
     bytes.extend_from_slice(MAGIC);
     bytes.extend_from_slice(&scene.width.to_le_bytes());
     bytes.extend_from_slice(&scene.height.to_le_bytes());
+    bytes.extend_from_slice(&scene.white.to_le_bytes());
     for look in &scene.looks {
         bytes.extend_from_slice(bytemuck::bytes_of(look));
     }
     for plane in [&scene.base, &scene.glow] {
         bytes.extend(plane.iter().flat_map(|v| v.to_le_bytes()));
     }
+    bytes.extend(scene.clear.iter().map(|&c| u8::from(c)));
     std::fs::write(path, bytes)?;
     Ok(())
 }
@@ -165,22 +195,23 @@ pub fn save(scene: &Scene, path: &Path) -> Result<()> {
 pub fn open(path: &Path) -> Result<Scene> {
     let bytes = std::fs::read(path)?;
     let look_size = std::mem::size_of::<LookParams>();
-    let header = 16 + 2 * look_size;
+    let header = 20 + 2 * look_size;
     if bytes.len() < header || &bytes[..8] != MAGIC {
         return Err(error(format!(
-            "{} is not a spike scene file",
+            "{} is not a Star Photos scene file",
             path.display()
         )));
     }
-    let word =
-        |at: usize| u32::from_le_bytes([bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]]);
-    let (width, height) = (word(8), word(12));
-    let n = 4 * (width as usize) * (height as usize);
-    if bytes.len() != header + 4 * n {
+    let word = |at: usize| [bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]];
+    let (width, height) = (u32::from_le_bytes(word(8)), u32::from_le_bytes(word(12)));
+    let white = f32::from_le_bytes(word(16));
+    let pixels = (width as usize) * (height as usize);
+    let n = 4 * pixels;
+    if bytes.len() != header + 4 * n + pixels {
         return Err(error("the scene file is truncated"));
     }
     let look = |k: usize| -> LookParams {
-        bytemuck::pod_read_unaligned(&bytes[16 + k * look_size..16 + (k + 1) * look_size])
+        bytemuck::pod_read_unaligned(&bytes[20 + k * look_size..20 + (k + 1) * look_size])
     };
     let plane = |at: usize| -> Vec<u16> {
         bytes[at..at + 2 * n]
@@ -195,6 +226,8 @@ pub fn open(path: &Path) -> Result<Scene> {
         height,
         base: plane(header),
         glow: plane(header + 2 * n),
+        white,
+        clear: bytes[header + 4 * n..].iter().map(|&b| b != 0).collect(),
         looks: [look(0), look(1)],
         names: ["natural", "dark"],
     })

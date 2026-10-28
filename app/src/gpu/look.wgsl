@@ -1,6 +1,7 @@
 // A look applied to the linear scene on the GPU: the review renderer's `finish` for the sky
 // (black removed, saturation, asinh stretch, shadow curve) blended in display values with the
-// as-shot foreground by the sky weight, stored as linear display light.
+// as-shot foreground by the sky weight, stored as linear display light with the sky weight in
+// alpha (for the sky and ground overlay).
 
 struct Look {
     black: vec4<f32>,
@@ -50,5 +51,5 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         let ground = encode(c[k] / look.white);
         shown[k] = decode(s.a * sky + (1.0 - s.a) * ground);
     }
-    textureStore(out, id.xy, vec4<f32>(shown, 1.0));
+    textureStore(out, id.xy, vec4<f32>(shown, s.a));
 }

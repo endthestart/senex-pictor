@@ -106,6 +106,37 @@ pub fn find(
     })
 }
 
+/// The profile for `lens` on a camera made by `make` (its first word names the maker).
+pub fn for_camera(
+    make: Option<&str>,
+    lens: &str,
+    focal_mm: f64,
+    aperture: f64,
+) -> Result<Vignetting> {
+    let maker = make.and_then(|s| s.split_whitespace().next()).unwrap_or("");
+    find(&database()?, maker, lens, focal_mm, aperture)
+}
+
+/// Every lens with a calibrated "pa" profile at `focal_mm` (within 0.5 mm), by name.
+pub fn candidates(focal_mm: f64) -> Result<Vec<String>> {
+    let database = database()?;
+    let mut names = Vec::new();
+    for entry in std::fs::read_dir(&database)? {
+        let path = entry?.path();
+        if path.extension().is_none_or(|x| x != "xml") {
+            continue;
+        }
+        for e in vignetting_entries(&std::fs::read_to_string(&path)?)? {
+            if (e.focal_mm - focal_mm).abs() <= 0.5 {
+                names.extend(e.models.into_iter().take(1));
+            }
+        }
+    }
+    names.sort();
+    names.dedup();
+    Ok(names)
+}
+
 /// V(x, y) for an image of `width × height` pixels, row-major, 1 at the centre.
 pub fn field(width: usize, height: usize, k: [f64; 3]) -> Vec<f32> {
     let (cx, cy) = ((width as f64 - 1.0) / 2.0, (height as f64 - 1.0) / 2.0);

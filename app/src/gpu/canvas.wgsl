@@ -2,7 +2,8 @@
 // sampled from two GPU-resident renderings. `swap` picks which one is shown; framebuffer pixels
 // right of `split` show the other, so a split view and an instant swap need no extra pass.
 // Linear display light goes out as is to float and sRGB targets, encoded for 8-bit targets
-// that egui treats as gamma space, and scaled to paper white.
+// that egui treats as gamma space, and scaled to paper white. The overlay tints sky blue and
+// the boundary between sky and ground orange, strongest where the sky weight in alpha is half.
 
 struct View {
     lo: vec2<f32>,
@@ -24,6 +25,9 @@ struct Out {
 };
 
 const ENCODE: u32 = 1u;
+const OVERLAY: u32 = 2u;
+const SKY_TINT = vec3<f32>(0.045, 0.16, 0.52);
+const EDGE_TINT = vec3<f32>(0.87, 0.35, 0.05);
 
 fn encode(v: f32) -> f32 {
     let a = clamp(v, 0.0, 1.0);
@@ -41,10 +45,17 @@ fn vs(@builtin(vertex_index) i: u32) -> Out {
 
 @fragment
 fn fs(in: Out) -> @location(0) vec4<f32> {
-    let a = textureSample(first, smp, in.uv).rgb;
-    let b = textureSample(second, smp, in.uv).rgb;
+    let a = textureSample(first, smp, in.uv);
+    let b = textureSample(second, smp, in.uv);
     let other = in.pos.x >= view.split;
-    var c = select(a, b, (view.swap == 1u) != other) * view.scale;
+    let s = select(a, b, (view.swap == 1u) != other);
+    var c = s.rgb;
+    if (view.mode & OVERLAY) != 0u {
+        let edge = 1.0 - abs(2.0 * s.a - 1.0);
+        c = mix(c, SKY_TINT, 0.35 * s.a * (1.0 - edge));
+        c = mix(c, EDGE_TINT, 0.55 * edge);
+    }
+    c = c * view.scale;
     if (view.mode & ENCODE) != 0u {
         c = vec3<f32>(encode(c.r), encode(c.g), encode(c.b));
     }

@@ -1,23 +1,26 @@
 use egui_kittest::Harness;
+use egui_kittest::kittest::Queryable;
 use star_photos::{Result, error};
 use star_photos_app::app::{StarPhotos, Start};
+use star_photos_app::shell::Step;
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-const SIZE: [f32; 2] = [1400.0, 900.0];
+const SIZE: [f32; 2] = [1440.0, 900.0];
 
-fn harness() -> Harness<'static, StarPhotos> {
+fn harness(open: Option<PathBuf>, demo: Option<[u32; 2]>) -> Harness<'static, StarPhotos> {
     Harness::builder()
         .with_size(SIZE)
         .with_pixels_per_point(1.0)
         .wgpu()
-        .build_eframe(|cc| {
+        .build_eframe(move |cc| {
             let device = cc.wgpu_render_state.as_ref().map(|r| r.device.clone());
             StarPhotos::new(
                 cc,
                 Start {
-                    folder: None,
-                    project: None,
-                    demo: Some([1200, 800]),
+                    open,
+                    demo,
+                    step: None,
                     mp: None,
                     gpu_name: "test".into(),
                     device: device
@@ -41,11 +44,32 @@ async fn test_device() -> wgpu::Device {
     }
 }
 
+/// Steps the harness until `done` holds or `seconds` pass.
+fn wait(
+    h: &mut Harness<'static, StarPhotos>,
+    seconds: u64,
+    done: impl Fn(&StarPhotos) -> bool,
+) -> Result<()> {
+    let start = Instant::now();
+    while !done(h.state()) {
+        if start.elapsed() > Duration::from_secs(seconds) {
+            return Err(error("timed out waiting for the app"));
+        }
+        h.step();
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    for _ in 0..3 {
+        h.step();
+    }
+    Ok(())
+}
+
 fn rgb(image: &image::RgbaImage, x: f32, y: f32) -> [u8; 3] {
     let p = image.get_pixel(x as u32, y as u32);
     [p[0], p[1], p[2]]
 }
 
+/// Saves `image` as `name` in `STAR_PHOTOS_UI_SHOTS`, when it is set.
 fn save(image: &image::RgbaImage, name: &str) -> Result<()> {
     let Ok(dir) = std::env::var("STAR_PHOTOS_UI_SHOTS") else {
         return Ok(());
@@ -65,30 +89,173 @@ fn save(image: &image::RgbaImage, name: &str) -> Result<()> {
 }
 
 #[test]
+fn the_first_screen_offers_to_open_a_folder() -> Result<()> {
+    let mut h = harness(None, None);
+    h.step();
+    let shot = h.render().map_err(error)?;
+    save(&shot, "welcome.jpg")?;
+    assert!(h.query_by_label("Open a folder…").is_some());
+    assert!(!h.state().opened());
+    Ok(())
+}
+
+#[test]
 fn space_swaps_the_two_renderings_on_the_compare_screen() -> Result<()> {
-    let mut h = harness();
-    let start = Instant::now();
-    while !h.state().comparing() {
-        if start.elapsed() > Duration::from_secs(120) {
-            return Err(error("the demo scene did not open"));
-        }
-        h.step();
-        std::thread::sleep(Duration::from_millis(50));
-    }
-    for _ in 0..3 {
-        h.step();
-    }
+    let mut h = harness(None, Some([1200, 800]));
+    wait(&mut h, 120, StarPhotos::comparing)?;
     let before = h.render().map_err(error)?;
     save(&before, "compare.jpg")?;
     h.key_press(egui::Key::Space);
     h.step();
     let after = h.render().map_err(error)?;
     save(&after, "compare-swapped.jpg")?;
-    let centre = (SIZE[0] * 0.45, SIZE[1] * 0.3);
+    let centre = (SIZE[0] * 0.4, SIZE[1] * 0.3);
     assert_ne!(
         rgb(&before, centre.0, centre.1),
         rgb(&after, centre.0, centre.1),
         "the sky should change when Space swaps natural for dark"
     );
+    Ok(())
+}
+
+/// Every step of a processed folder draws (`STAR_PHOTOS_UI_FOLDER`; skipped without it), and
+/// the overlay key changes the Sky & ground canvas.
+#[test]
+fn every_step_of_a_processed_folder_draws() -> Result<()> {
+    let Ok(folder) = std::env::var("STAR_PHOTOS_UI_FOLDER") else {
+        eprintln!("STAR_PHOTOS_UI_FOLDER is not set; skipped");
+        return Ok(());
+    };
+    let mut h = harness(Some(PathBuf::from(folder)), None);
+    wait(&mut h, 300, StarPhotos::opened)?;
+    for step in Step::ALL {
+        h.state_mut().show_step(step);
+        wait(&mut h, 60, StarPhotos::idle)?;
+        let shot = h.render().map_err(error)?;
+        save(&shot, &format!("step-{step:?}.jpg").to_lowercase())?;
+        if step == Step::Sky {
+            h.key_press(egui::Key::O);
+            h.step();
+            let plain = h.render().map_err(error)?;
+            save(&plain, "step-sky-plain.jpg")?;
+            assert_ne!(shot.as_raw(), plain.as_raw(), "O should toggle the overlay");
+        }
+    }
+    Ok(())
+}
+
+/// A folder of RAW files opens on Import and is checked in the background
+/// (`STAR_PHOTOS_UI_RAW`; skipped without it).
+#[test]
+fn a_raw_folder_is_checked_before_anything_is_processed() -> Result<()> {
+    let Ok(folder) = std::env::var("STAR_PHOTOS_UI_RAW") else {
+        eprintln!("STAR_PHOTOS_UI_RAW is not set; skipped");
+        return Ok(());
+    };
+    let mut h = harness(Some(PathBuf::from(folder)), None);
+    h.step();
+    assert!(!h.state().idle(), "the check should run in the background");
+    let checking = h.render().map_err(error)?;
+    save(&checking, "import-checking.jpg")?;
+    wait(&mut h, 600, StarPhotos::idle)?;
+    assert!(
+        !h.state().opened(),
+        "nothing is processed or opened before Start"
+    );
+    let ready = h.render().map_err(error)?;
+    save(&ready, "import.jpg")?;
+    Ok(())
+}
+
+/// A stopped run opens on Import with Resume; resuming shows the run's progress and Cancel
+/// stops it again (`STAR_PHOTOS_UI_STOPPED`, an output folder whose run stopped; skipped
+/// without it).
+#[test]
+fn a_stopped_run_resumes_and_cancels_from_import() -> Result<()> {
+    let Ok(folder) = std::env::var("STAR_PHOTOS_UI_STOPPED") else {
+        eprintln!("STAR_PHOTOS_UI_STOPPED is not set; skipped");
+        return Ok(());
+    };
+    let mut h = harness(Some(PathBuf::from(folder)), None);
+    wait(&mut h, 60, StarPhotos::idle)?;
+    let stopped = h.render().map_err(error)?;
+    save(&stopped, "import-stopped.jpg")?;
+    h.get_by_label("Resume").click();
+    h.step();
+    assert!(!h.state().idle(), "Resume should start the run");
+    let start = Instant::now();
+    while start.elapsed() < Duration::from_secs(8) {
+        h.step();
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let running = h.render().map_err(error)?;
+    save(&running, "import-running.jpg")?;
+    h.get_by_label("Cancel").click();
+    wait(&mut h, 300, StarPhotos::idle)?;
+    assert!(!h.state().opened(), "a cancelled run opens nothing");
+    let cancelled = h.render().map_err(error)?;
+    save(&cancelled, "import-cancelled.jpg")?;
+    Ok(())
+}
+
+/// From the Scene step a hero composite is made in the background and opens in Compare
+/// (`STAR_PHOTOS_UI_FOLDER`; skipped without it; adds the hero result to that folder).
+#[test]
+fn a_hero_frame_is_made_from_the_scene_step() -> Result<()> {
+    let Ok(folder) = std::env::var("STAR_PHOTOS_UI_FOLDER") else {
+        eprintln!("STAR_PHOTOS_UI_FOLDER is not set; skipped");
+        return Ok(());
+    };
+    let mut h = harness(Some(PathBuf::from(folder)), None);
+    wait(&mut h, 300, StarPhotos::opened)?;
+    h.state_mut().show_step(Step::Scene);
+    wait(&mut h, 60, StarPhotos::idle)?;
+    let before = h.render().map_err(error)?;
+    save(&before, "scene.jpg")?;
+    let made = h.query_all_by_label("Open in Compare").next().is_some();
+    if made {
+        h.get_by_label("Open in Compare").click();
+    } else {
+        h.get_all_by_label("Make it")
+            .next()
+            .ok_or_else(|| error("no Make it"))?
+            .click();
+        h.step();
+        let making = h.render().map_err(error)?;
+        save(&making, "scene-making.jpg")?;
+    }
+    wait(&mut h, 600, |a| a.idle() && a.comparing())?;
+    let opened = h.render().map_err(error)?;
+    save(&opened, "scene-hero-compare.jpg")?;
+    Ok(())
+}
+
+/// From the Scene step a short-window moment is made and opens in Compare
+/// (`STAR_PHOTOS_UI_STACKED`, a processed folder with a whole-sequence stack; skipped without
+/// it; adds the moment to that folder).
+#[test]
+fn a_moment_is_made_from_the_scene_step() -> Result<()> {
+    let Ok(folder) = std::env::var("STAR_PHOTOS_UI_STACKED") else {
+        eprintln!("STAR_PHOTOS_UI_STACKED is not set; skipped");
+        return Ok(());
+    };
+    let mut h = harness(Some(PathBuf::from(folder)), None);
+    wait(&mut h, 300, StarPhotos::opened)?;
+    h.state_mut().show_step(Step::Scene);
+    wait(&mut h, 60, StarPhotos::idle)?;
+    let buttons = h.query_all_by_label("Make it").count();
+    assert!(
+        buttons >= 1,
+        "the moment should be offered for a stacked run"
+    );
+    h.get_all_by_label("Make it")
+        .last()
+        .ok_or_else(|| error("no Make it"))?
+        .click();
+    h.step();
+    assert!(!h.state().idle(), "Make it should start the moment");
+    wait(&mut h, 900, |a| a.idle() && a.comparing())?;
+    let opened = h.render().map_err(error)?;
+    save(&opened, "scene-moment-compare.jpg")?;
     Ok(())
 }

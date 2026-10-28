@@ -78,11 +78,10 @@ fn run() -> Result<()> {
             );
         }
         [command, dir] if command == "check" => {
-            let (captures, steps) =
-                sequence::capture_all(&input::raw_files(Path::new(dir))?, &budget)?;
+            let c = sequence::capture_all(&input::raw_files(Path::new(dir))?, &budget)?;
             println!(
                 "{}",
-                serde_json::to_string_pretty(&sequence::check(&captures, &steps)?)?
+                serde_json::to_string_pretty(&sequence::check(&c.captures, &c.steps)?)?
             );
         }
         [command, dir, out, rest @ ..] if command == "ingest" && rest.len() <= 2 => {

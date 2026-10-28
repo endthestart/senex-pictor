@@ -49,10 +49,14 @@ pub fn write(
         Budget::held(w * h),
         MASK_BYTES_PER_PIXEL * (w * h) as u64,
     )?;
+    budget
+        .progress
+        .step("Keeping sky samples clear of the ground", n);
     let widest: Vec<f64> = pool.install(|| {
         (0..n)
             .into_par_iter()
             .map(|i| {
+                budget.progress.advance()?;
                 let (mask, widest) = match fields.iter().find(|(j, _)| *j == i) {
                     None => (vec![true; w * h], 0.0),
                     Some((_, d)) => match &d.turn {

@@ -1,10 +1,12 @@
 //! The memory a run may use and how many workers each parallel step gets within it. By default
 //! a share of the memory free when the run starts and every core: a small machine runs fewer
 //! workers (slower, same result), a large one uses every core. A step that cannot fit even one
-//! worker fails with what it needs rather than swapping.
+//! worker fails with what it needs rather than swapping. The budget also carries the run's
+//! progress and cancel flag to every step it sizes.
 
+use crate::progress::Progress;
 use crate::{Result, error};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Share of the free memory a run takes unless told otherwise, leaving room for other
 /// applications.
@@ -15,10 +17,12 @@ pub const SHARE_OF_FREE: f64 = 0.75;
 pub const HELD_PER_PIXEL: u64 = 160;
 const GB: f64 = 1e9;
 
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Budget {
     pub bytes: u64,
     pub threads: usize,
+    #[serde(skip)]
+    pub progress: Progress,
 }
 
 fn cores() -> Result<usize> {
@@ -36,6 +40,7 @@ impl Budget {
         Ok(Budget {
             bytes: (gigabytes * GB) as u64,
             threads: cores()?,
+            progress: Progress::default(),
         })
     }
 
