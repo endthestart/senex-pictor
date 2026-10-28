@@ -113,8 +113,12 @@ licence recorded in the reuse audit); sep, astroalign and SAM stay oracles until
   before ingesting (Northern Lights' full 1,039-frame run would need 218 GB) and takes
   `--first`/`--last` to process part of a run.
 
-Next (owner direction 2026-10-27): a research, design and UI/UX phase for the desktop app
-(M4) before more options are added to the command line.
+Desktop app (M4, started 2026-10-27): research report (`reports/Star Photos app research.md`),
+six screen designs (private design canvas), toolkit decided in ADR 0011 from the canvas spike
+(45 MP on an M2 Max: under 1 ms of GPU per frame, 120 Hz in a window, 5 ms look recompute,
+EDR confirmed). The app crate (`app/`) has Open and Compare; next come engine progress and
+cancel hooks for running `process` from the app, then Frames, Sky & ground, Scene, Look &
+export.
 
 Gate per milestone: prototype parity on Wild River, Maplewood, Northern Lights, BWCA and
 Yellowstone (registration angles within 1e-4°, matte agreement on 99.5% of pixels, stack

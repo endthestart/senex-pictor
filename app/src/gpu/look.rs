@@ -2,8 +2,8 @@
 //! a compute pass applies a look at the output size (sampling the scene, so a 24 MP stack can
 //! stand in for a 45 MP one), then the mip levels are rebuilt. Nothing is read back.
 
-use crate::mips::{self, Mips};
-use crate::source::{LookParams, Scene};
+use super::mips::{self, Mips};
+use crate::scene::{LookParams, Scene};
 use star_photos::{Result, error};
 use std::time::Instant;
 

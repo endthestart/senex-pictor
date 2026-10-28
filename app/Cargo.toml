@@ -1,9 +1,9 @@
 [package]
-name = "canvas-spike"
+name = "star-photos-app"
 version = "0.1.0"
 edition = "2024"
 publish = false
-description = "Toolkit validation spike: a 45 MP canvas on a shared wgpu device in eframe"
+description = "Star Photos desktop app (egui on a shared wgpu device, ADR 0011)"
 
 [dependencies]
 bytemuck = { version = "1", features = ["derive"] }
@@ -11,9 +11,15 @@ eframe = { version = "0.36", default-features = false, features = ["default_font
 egui = "0.36"
 half = "2.7"
 pollster = "1"
+rfd = "0.17"
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-star-photos = { path = "../.." }
+star-photos = { path = ".." }
 wgpu = { version = "30", default-features = false, features = ["std", "parking_lot", "metal", "vulkan", "dx12", "wgsl"] }
+
+[dev-dependencies]
+egui_kittest = { version = "0.36", features = ["wgpu", "eframe"] }
+image = { version = "0.25", default-features = false }
 
 [lints.rust]
 unsafe_code = "forbid"

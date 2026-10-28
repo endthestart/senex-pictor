@@ -2,10 +2,11 @@
 //! ragged treeline, a Milky Way band, tens of thousands of stars, and a dark foreground with a
 //! warm lit patch. Linear sRGB with sensor white at 1; deterministic.
 
-use crate::source::{self, Scene};
+use crate::scene::{self, Scene};
 use star_photos::Result;
 
-const STARS: usize = 60_000;
+/// Stars per megapixel (60,000 over 24 MP).
+const STARS_PER_MP: f64 = 2500.0;
 
 struct Random(u64);
 
@@ -83,7 +84,8 @@ pub fn scene(width: u32, height: u32) -> Result<Scene> {
             }
         }
     }
-    for _ in 0..STARS {
+    let stars = (STARS_PER_MP * (w * h) as f64 / 1e6) as usize;
+    for _ in 0..stars {
         let (sx, sy) = (random.next() * w as f32, random.next() * h as f32);
         if sy >= horizon[(sx as usize).min(w - 1)] {
             continue;
@@ -111,5 +113,5 @@ pub fn scene(width: u32, height: u32) -> Result<Scene> {
         }
     }
     let clear: Vec<bool> = alpha.iter().map(|&a| a >= 0.98).collect();
-    source::assemble(width, height, &base, &glow, &alpha, &clear, 1.0)
+    scene::assemble(width, height, &base, &glow, &alpha, &clear, 1.0)
 }

@@ -2,9 +2,9 @@
 //! into a window-sized target at fit, 100% and 200%, swapping renderings every frame. Each frame
 //! is submitted and waited for, so the times are what the GPU needs, independent of the display.
 
-use crate::canvas::{self, CanvasGpu, View};
-use crate::look::{FORMAT, Looks};
-use crate::source::LookParams;
+use crate::gpu::canvas::{self, CanvasGpu, View};
+use crate::gpu::look::{FORMAT, Looks};
+use crate::scene::LookParams;
 use crate::stats;
 use star_photos::{Result, error};
 use std::time::Instant;
@@ -62,16 +62,7 @@ pub fn run(
             let sweep = (f as f32 / FRAMES as f32 * std::f32::consts::TAU).sin() * 0.4 + 0.5;
             let (lo, hi) = canvas::place(size, img, zoom, [img[0] * sweep, img[1] * 0.5]);
             let start = Instant::now();
-            gpu.set_view(
-                queue,
-                0,
-                &View {
-                    lo,
-                    hi,
-                    scale: 1.0,
-                    ..Default::default()
-                },
-            );
+            gpu.set_view(queue, 0, &View::image(lo, hi, 1.0, 0, f % 2 == 1));
             let mut encoder = device.create_command_encoder(&Default::default());
             {
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -90,7 +81,7 @@ pub fn run(
                     timestamp_writes: None,
                     multiview_mask: None,
                 });
-                gpu.draw(&mut pass, 0, f % 2, zoom >= 2.0);
+                gpu.draw(&mut pass, 0, zoom >= 2.0);
             }
             wait(device, queue.submit([encoder.finish()]))?;
             times.push(start.elapsed().as_secs_f64());

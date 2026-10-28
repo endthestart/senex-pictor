@@ -23,6 +23,11 @@ Updated: 2026-10-27 (Rust port R7: one command from folder to finished image).
   provenance report. 18 synthetic-truth tests; deliberate faults caught. Not in the CLI.
 - Two-phase plan: Phase 1 core sky/foreground logic first, Phase 2 decoder and
   calibration hardening ([plan](plan.md)); installs logged in [install-log](install-log.md).
+- Desktop app start (2026-10-27): app research report, screen designs, ADR 0011 (egui on a
+  shared wgpu device, LightCraft Classic's HDR-patched egui-wgpu vendored); `app/` opens a
+  processed folder, store or scene file and compares two GPU-resident looks (instant swap,
+  split, auto-chosen region crops with saved verdicts, live stretch); headless UI test with
+  kittest (41 tests).
 - Rust port R7 (2026-10-27): `process RAW_DIR OUT` (`src/process.rs`) runs every stage and
   renders the finished image; memory budget (`src/budget.rs`, `--memory GB`, default 75% of
   free memory) sizes every parallel step and keeps outputs byte-identical; foreground as

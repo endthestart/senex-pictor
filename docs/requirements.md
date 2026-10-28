@@ -46,9 +46,10 @@ Preserve independent processing interfaces for these, without building empty mod
 
 ## Decisions still open
 
-Product identity, outbound distribution license, desktop toolkit, portable GPU framework,
+Product identity, outbound distribution license, portable GPU framework,
 final master format/profile options, scientific algorithms and numerical acceptance thresholds.
-Resolve by evidence and ADRs, without changing accepted product scope implicitly.
+Resolve by evidence and ADRs, without changing accepted product scope implicitly. The desktop
+toolkit is decided in [ADR 0011](adr/0011-desktop-toolkit.md).
 
 ## Existing work
 

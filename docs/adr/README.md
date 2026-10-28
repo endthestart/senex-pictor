@@ -14,6 +14,7 @@ Accepted means agreed product/architecture direction. Proposed means not selecte
 | [0008 Sky registration](0008-sky-registration.md) | Proposed; prototype evidence on three Z6 II sequences |
 | [0009 Sky separation](0009-sky-separation.md) | Proposed; prototype evidence on three Z6 II sequences |
 | [0010 Sequence check and drift](0010-sequence-check-and-drift.md) | Proposed; prototype evidence on Yellowstone (D700) and BWCA |
+| [0011 Desktop toolkit](0011-desktop-toolkit.md) | Accepted: egui on a shared wgpu device |
 
-Future ADRs: public license, desktop toolkit, GPU framework, color characterization,
+Future ADRs: public license, GPU framework, color characterization,
 master/export formats, distortion model, registration and rejection methods.

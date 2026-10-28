@@ -1,26 +1,28 @@
 // The canvas: one quad for the visible image in the callback's normalized device coordinates,
-// sampled from a GPU-resident rendering. Linear display light goes out as is to float and sRGB
-// targets, encoded for 8-bit targets that egui treats as gamma space, and scaled to paper white.
+// sampled from two GPU-resident renderings. `swap` picks which one is shown; framebuffer pixels
+// right of `split` show the other, so a split view and an instant swap need no extra pass.
+// Linear display light goes out as is to float and sRGB targets, encoded for 8-bit targets
+// that egui treats as gamma space, and scaled to paper white.
 
 struct View {
     lo: vec2<f32>,
     hi: vec2<f32>,
-    solid: vec4<f32>,
     scale: f32,
     mode: u32,
-    pad: vec2<f32>,
+    swap: u32,
+    split: f32,
 };
 
 @group(0) @binding(0) var<uniform> view: View;
-@group(1) @binding(0) var image: texture_2d<f32>;
-@group(1) @binding(1) var smp: sampler;
+@group(1) @binding(0) var first: texture_2d<f32>;
+@group(1) @binding(1) var second: texture_2d<f32>;
+@group(1) @binding(2) var smp: sampler;
 
 struct Out {
     @builtin(position) pos: vec4<f32>,
     @location(0) uv: vec2<f32>,
 };
 
-const SOLID: u32 = 2u;
 const ENCODE: u32 = 1u;
 
 fn encode(v: f32) -> f32 {
@@ -39,11 +41,10 @@ fn vs(@builtin(vertex_index) i: u32) -> Out {
 
 @fragment
 fn fs(in: Out) -> @location(0) vec4<f32> {
-    var c = textureSample(image, smp, in.uv).rgb;
-    if (view.mode & SOLID) != 0u {
-        c = view.solid.rgb;
-    }
-    c = c * view.scale;
+    let a = textureSample(first, smp, in.uv).rgb;
+    let b = textureSample(second, smp, in.uv).rgb;
+    let other = in.pos.x >= view.split;
+    var c = select(a, b, (view.swap == 1u) != other) * view.scale;
     if (view.mode & ENCODE) != 0u {
         c = vec3<f32>(encode(c.r), encode(c.g), encode(c.b));
     }

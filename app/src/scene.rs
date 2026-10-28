@@ -130,6 +130,19 @@ pub fn load(dir: &Path, planes: &str) -> Result<Scene> {
     )
 }
 
+/// The size to render `scene` at: its own, or `mp` megapixels at its aspect ratio (a stand-in
+/// for a larger sensor).
+pub fn output_size(scene: &Scene, mp: Option<f64>) -> [u32; 2] {
+    match mp {
+        None => [scene.width, scene.height],
+        Some(mp) => {
+            let (w, h) = (f64::from(scene.width), f64::from(scene.height));
+            let k = (mp * 1e6 / (w * h)).sqrt();
+            [(w * k).round() as u32, (h * k).round() as u32]
+        }
+    }
+}
+
 const MAGIC: &[u8; 8] = b"SPSCENE1";
 
 /// Writes the scene to `path`: magic, width, height, both looks, then the two RGBA half-float

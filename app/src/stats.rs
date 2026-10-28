@@ -18,17 +18,6 @@ pub fn summary(values: &[f64]) -> serde_json::Value {
     })
 }
 
-pub fn summary_ms(values: &[f64]) -> String {
-    let mut v = values.to_vec();
-    v.sort_by(f64::total_cmp);
-    format!(
-        "median {:.1} ms, p95 {:.1} ms ({} frames)",
-        percentile(&v, 50.0) * 1e3,
-        percentile(&v, 95.0) * 1e3,
-        v.len()
-    )
-}
-
 /// Summaries per named phase, in the order the phases first appear.
 pub fn by_phase(samples: &[(&'static str, f64)]) -> serde_json::Value {
     let mut names: Vec<&str> = Vec::new();

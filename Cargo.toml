@@ -6,7 +6,7 @@ publish = false
 description = "Full-resolution nightscape processing research"
 
 [workspace]
-members = ["spikes/canvas"]
+members = ["app"]
 exclude = ["vendor/lightcraft-classic", "vendor/egui-wgpu"]
 
 [patch.crates-io]

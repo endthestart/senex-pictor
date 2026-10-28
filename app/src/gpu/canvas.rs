@@ -1,34 +1,63 @@
-//! Drawing a GPU-resident rendering inside egui: a paint callback that writes its view to its own
-//! uniform slot in `prepare` and draws one quad in `paint`. Both renderings stay bound, so a swap
-//! changes only which bind group the next frame uses.
+//! Drawing GPU-resident renderings inside egui: a paint callback that writes its view to its own
+//! uniform slot in `prepare` and draws one quad in `paint`. Both renderings stay bound; the view
+//! says which one shows and where a split line hands over to the other, so a swap or a split
+//! changes only a uniform in the next frame.
 
 use eframe::egui_wgpu::{self, CallbackResources, CallbackTrait, ScreenDescriptor};
 
-/// Uniform slots: the canvas and three EDR test swatches.
-pub const SLOTS: u64 = 4;
+/// Uniform slots: the main canvas and the comparison crops.
+pub const SLOTS: u64 = 32;
 const SLOT: u64 = 256;
 
 /// `canvas.wgsl` `View`.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct View {
     pub lo: [f32; 2],
     pub hi: [f32; 2],
-    pub solid: [f32; 4],
     pub scale: f32,
     pub mode: u32,
-    pub pad: [f32; 2],
+    /// 1 shows the second rendering.
+    pub swap: u32,
+    /// Framebuffer x (physical px) from which the other rendering shows.
+    pub split: f32,
+}
+
+impl View {
+    /// The image quad `lo`..`hi`, rendering `swap` shown whole.
+    pub fn image(lo: [f32; 2], hi: [f32; 2], scale: f32, mode: u32, swap: bool) -> View {
+        View {
+            lo,
+            hi,
+            scale,
+            mode,
+            swap: u32::from(swap),
+            split: f32::MAX,
+        }
+    }
 }
 
 pub const MODE_ENCODE: u32 = 1;
-pub const MODE_SOLID: u32 = 2;
 
 pub struct CanvasGpu {
     pipeline: wgpu::RenderPipeline,
     uniform: wgpu::Buffer,
     uniform_group: wgpu::BindGroup,
-    /// Per rendering, per sampler (trilinear, nearest).
-    images: [[wgpu::BindGroup; 2]; 2],
+    /// Both renderings, per sampler (trilinear, nearest).
+    images: [wgpu::BindGroup; 2],
+}
+
+fn texture_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility: wgpu::ShaderStages::FRAGMENT,
+        ty: wgpu::BindingType::Texture {
+            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+            view_dimension: wgpu::TextureViewDimension::D2,
+            multisampled: false,
+        },
+        count: None,
+    }
 }
 
 impl CanvasGpu {
@@ -57,18 +86,10 @@ impl CanvasGpu {
         let image_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("canvas image"),
             entries: &[
+                texture_entry(0),
+                texture_entry(1),
                 wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
+                    binding: 2,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
@@ -137,23 +158,26 @@ impl CanvasGpu {
             })
         };
         let samplers = [sampler(false), sampler(true)];
-        let images = std::array::from_fn(|r| {
-            let view = renderings[r].create_view(&Default::default());
-            std::array::from_fn(|s| {
-                device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    label: Some("canvas image"),
-                    layout: &image_layout,
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: wgpu::BindingResource::TextureView(&view),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: wgpu::BindingResource::Sampler(&samplers[s]),
-                        },
-                    ],
-                })
+        let views: [wgpu::TextureView; 2] =
+            std::array::from_fn(|k| renderings[k].create_view(&Default::default()));
+        let images = std::array::from_fn(|k| {
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("canvas images"),
+                layout: &image_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&views[0]),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(&views[1]),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: wgpu::BindingResource::Sampler(&samplers[k]),
+                    },
+                ],
             })
         });
         CanvasGpu {
@@ -168,16 +192,10 @@ impl CanvasGpu {
         queue.write_buffer(&self.uniform, slot * SLOT, bytemuck::bytes_of(view));
     }
 
-    pub fn draw(
-        &self,
-        pass: &mut wgpu::RenderPass<'_>,
-        slot: u64,
-        rendering: usize,
-        nearest: bool,
-    ) {
+    pub fn draw(&self, pass: &mut wgpu::RenderPass<'_>, slot: u64, nearest: bool) {
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, &self.uniform_group, &[(slot * SLOT) as u32]);
-        pass.set_bind_group(1, &self.images[rendering][usize::from(nearest)], &[]);
+        pass.set_bind_group(1, &self.images[usize::from(nearest)], &[]);
         pass.draw(0..4, 0..1);
     }
 }
@@ -186,7 +204,6 @@ impl CanvasGpu {
 pub struct Draw {
     pub view: View,
     pub slot: u64,
-    pub rendering: usize,
     pub nearest: bool,
 }
 
@@ -212,7 +229,7 @@ impl CallbackTrait for Draw {
         resources: &CallbackResources,
     ) {
         if let Some(gpu) = resources.get::<CanvasGpu>() {
-            gpu.draw(pass, self.slot, self.rendering, self.nearest);
+            gpu.draw(pass, self.slot, self.nearest);
         }
     }
 }

@@ -31,6 +31,14 @@ files to a finished image:
   the exposure it was shot with. The working store and `process.json` (every stage's report
   and time) stay in the output folder.
 
+The desktop app (`app/`, egui on the shared wgpu device, [ADR 0011](docs/adr/0011-desktop-toolkit.md))
+opens a `process` output folder, a store or a scene file and so far has two steps: Open and
+Compare. Compare keeps two looks on the GPU (Space swaps them in place, S splits the view),
+shows regions chosen from the image as 200% crops of both with A / same / B verdicts saved to
+`compare.json`, and recomputes each look's sky stretch live. `cargo run --release -p
+star-photos-app -- [FOLDER]`; `cargo test -p star-photos-app` renders the window headlessly
+(`STAR_PHOTOS_UI_SHOTS=DIR` saves the frames).
+
 Every command takes `--memory GB` (before the command): the memory the run may use. Without
 it the run takes 75% of the memory free when it starts. Each parallel step runs as many
 workers as fit (at most one per core) and fails with what it needs when even one does not.
