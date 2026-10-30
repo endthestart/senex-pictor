@@ -2,6 +2,7 @@
 //! under drift, by a free rotation per frame fitted to stars (ADR 0010).
 
 use super::camera::{Camera, Vec3};
+use super::chroma::Chroma;
 use crate::stars::similarity::Point;
 use serde::{Deserialize, Serialize};
 
@@ -76,6 +77,8 @@ pub struct SkyModel {
     pub angles: Vec<f64>,
     pub reference: usize,
     pub rotations: Option<Vec<Matrix>>,
+    /// Where red and blue image what green images (measured at registration).
+    pub chroma: Chroma,
 }
 
 impl SkyModel {

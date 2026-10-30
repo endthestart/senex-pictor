@@ -20,6 +20,8 @@ struct Params {
     f: f32, k1: f32, k2: f32, scale: f32,
     cx: f32, cy: f32, sigma: f32, radius: f32,
     clearance_px: f32, clear: f32, block: f32, words_per_row: u32,
+    // Red (xy) and blue (zw) radial scale terms a, b: sky::chroma::Chroma.
+    chroma: vec4<f32>,
 }
 
 struct Frame {
@@ -49,6 +51,17 @@ fn distort(u: vec2<f32>) -> vec2<f32> {
     let d = u - c;
     let r2 = dot(d, d) / (params.scale * params.scale);
     return c + d * (1.0 + params.k1 * r2 + params.k2 * r2 * r2);
+}
+
+// Where `colour` images what green images at `p` (sky::chroma::Chroma::place).
+fn place(p: vec2<f32>, colour: u32) -> vec2<f32> {
+    if (colour == 1u) {
+        return p;
+    }
+    let ab = select(params.chroma.zw, params.chroma.xy, colour == 0u);
+    let c = vec2<f32>(params.cx, params.cy);
+    let d = p - c;
+    return c + d * (1.0 + ab.x + ab.y * dot(d, d) / (params.scale * params.scale));
 }
 
 fn ray(p: vec2<f32>) -> vec3<f32> {
@@ -185,15 +198,16 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         let c = vec2<f32>(params.cx, params.cy);
         let p = distort(c + params.f * r.xy / r.z);
         let g = glow_at(i, p);
+        let pc = place(p, colour);
         for (var site = 0u; site < 4u; site++) {
             if (params.colours[site] != colour) {
                 continue;
             }
             let dx = f32(site % 2u);
             let dy = f32(site / 2u);
-            let sx = dx + 2.0 * round((p.x - dx) / 2.0);
-            let sy = dy + 2.0 * round((p.y - dy) / 2.0);
-            let d2 = (sx - p.x) * (sx - p.x) + (sy - p.y) * (sy - p.y);
+            let sx = dx + 2.0 * round((pc.x - dx) / 2.0);
+            let sy = dy + 2.0 * round((pc.y - dy) / 2.0);
+            let d2 = (sx - pc.x) * (sx - pc.x) + (sy - pc.y) * (sy - pc.y);
             if (!(sx >= 0.0 && sy >= 0.0 && sx < f32(w) && sy < f32(params.height) && d2 <= params.radius * params.radius)) {
                 continue;
             }

@@ -64,6 +64,8 @@ The stages also run one at a time:
 - `register STORE [--lens-from MODEL_JSON]`: stars detected and tracked in every frame, the sky model
   (fixed axis; free per-frame rotations when held-out stars show drift; another sequence's
   lens profile with a `model.json` from the same lens), written into the store with a report.
+  Lateral chromatic aberration is measured from star centroids on the raw colour sites (no
+  lens profile needed); the sky stack then samples red and blue where the lens put them.
 - `separate STORE [--labels PLANES] [--lens NAME]`: temporal statistics, sky-coherent star
   transits, the sky matte, camera-fixed glow and per-frame occlusion (`--lens` names a lens
   the files do not record, for its lensfun vignetting).

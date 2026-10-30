@@ -1,5 +1,6 @@
 use pictor_engine::Result;
 use pictor_engine::sky::Camera;
+use pictor_engine::sky::chroma::{Chroma, Raw, fitted, offsets};
 use pictor_engine::sky::drift::free_rotations;
 use pictor_engine::sky::fit::{Start, fit};
 use pictor_engine::sky::model::{SIDEREAL_RAD_PER_S, apply, rotation};
@@ -218,4 +219,76 @@ fn drift_breaks_the_fixed_axis_and_free_rotations_follow_it() -> Result<()> {
         );
     }
     Ok(())
+}
+
+#[test]
+fn colour_fringes_are_measured_from_star_centroids_on_the_raw_sites() {
+    let (w, h) = (1200, 900);
+    let camera = Camera {
+        width: w,
+        height: h,
+        f: 1000.0,
+        k1: 0.0,
+        k2: 0.0,
+    };
+    let truth = Chroma {
+        red: [2e-3, -1e-3],
+        blue: [-1e-3, 1.5e-3],
+    };
+    let cfa = [1u8, 0, 2, 1];
+    let mut random = Random::new(3);
+    let mut image: Vec<f64> = (0..w * h)
+        .map(|_| 400.0 + 6.0 * gaussian(&mut random))
+        .collect();
+    let mut stars = Vec::new();
+    for _ in 0..900 {
+        let green = [
+            20.0 + uniform(&mut random) * (w - 40) as f64,
+            20.0 + uniform(&mut random) * (h - 40) as f64,
+        ];
+        let peak = 300.0 + 3000.0 * uniform(&mut random);
+        for colour in 0..3 {
+            let [px, py] = truth.place(&camera, colour, green);
+            for y in (py as usize - 8)..(py as usize + 8) {
+                for x in (px as usize - 8)..(px as usize + 8) {
+                    if usize::from(cfa[(y % 2) * 2 + x % 2]) == colour {
+                        let r2 = (x as f64 - px).powi(2) + (y as f64 - py).powi(2);
+                        image[y * w + x] += peak * (-r2 / (2.0 * 1.3 * 1.3)).exp();
+                    }
+                }
+            }
+        }
+        stars.push(Star {
+            x: green[0],
+            y: green[1],
+            flux: peak,
+            saturated: false,
+        });
+    }
+    let samples: Vec<u16> = image.iter().map(|v| v.round() as u16).collect();
+    let raw = Raw {
+        samples: &samples,
+        width: w,
+        height: h,
+        cfa: &cfa,
+        cfa_width: 2,
+        cfa_height: 2,
+        black: &[0.0; 4],
+        white: 16383.0,
+    };
+    let (measured, report) = fitted(&offsets(&raw, &stars, &camera), camera.scale());
+    assert!(report.measured && report.stars >= 200, "{report:?}");
+    let shift = |c: &Chroma, colour: usize, r: f64| {
+        let p = [camera.centre()[0] + r * camera.scale(), camera.centre()[1]];
+        c.place(&camera, colour, p)[0] - p[0]
+    };
+    for colour in [0, 2] {
+        for r in [0.3, 0.6] {
+            let (got, want) = (shift(&measured, colour, r), shift(&truth, colour, r));
+            assert!(
+                (got - want).abs() < 0.05,
+                "colour {colour} at r {r}: {got} px, not {want}"
+            );
+        }
+    }
 }

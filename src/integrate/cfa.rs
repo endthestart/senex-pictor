@@ -242,7 +242,10 @@ fn pixel(inputs: &Inputs, rotations: &[Matrix], rows: &[Option<Rows>], q: usize)
         };
         let glow = inputs.glow[i].sample(p);
         let white = m.frames[i].white;
+        let places = [0, 1, 2].map(|c| inputs.model.chroma.place(camera, c, p));
         for site in 0..4 {
+            let c = usize::from(m.cfa[site]);
+            let p = places[c];
             let (dx, dy) = ((site % 2) as f64, (site / 2) as f64);
             let sx = dx + 2.0 * ((p[0] - dx) / 2.0).round_ties_even();
             let sy = dy + 2.0 * ((p[1] - dy) / 2.0).round_ties_even();
@@ -265,7 +268,6 @@ fn pixel(inputs: &Inputs, rotations: &[Matrix], rows: &[Option<Rows>], q: usize)
                 continue;
             }
             let raw = f32::from(band.cfa[local]);
-            let c = usize::from(m.cfa[site]);
             if raw >= white {
                 saturated[c] += 1;
                 continue;

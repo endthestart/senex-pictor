@@ -1,6 +1,7 @@
 //! Sky registration (ADR 0008, 0010): camera, sky model, robust fits and quality reports.
 
 pub mod camera;
+pub mod chroma;
 pub mod drift;
 pub mod fit;
 pub mod joint;

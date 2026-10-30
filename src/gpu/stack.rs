@@ -53,6 +53,8 @@ fn params(inputs: &Inputs, b0: usize, rows: usize, words_per_row: usize) -> Vec<
         (BLOCK as f32).to_bits(),
         words_per_row as u32,
     ]);
+    let chroma = &inputs.model.chroma;
+    p.extend([chroma.red[0], chroma.red[1], chroma.blue[0], chroma.blue[1]].map(f));
     p
 }
 

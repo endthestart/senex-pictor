@@ -3,6 +3,7 @@
 //! and fit free per-frame rotations when the fixed axis cannot follow the stars (drift).
 
 use crate::budget::Budget;
+use crate::sky::chroma::{self, Chroma, Offset, Raw};
 use crate::sky::drift::free_rotations;
 use crate::sky::fit::{Start, fit};
 use crate::sky::report::{Zone, held_out, sidereal_departure};
@@ -39,6 +40,7 @@ pub struct Report {
     pub held_out: Vec<(String, Vec<Zone>)>,
     pub drift: bool,
     pub held_out_free: Vec<(String, Vec<Zone>)>,
+    pub chromatic_aberration: chroma::Report,
     pub seconds: [f64; 3],
 }
 
@@ -59,6 +61,47 @@ pub fn detect_all(store: &Store, budget: &Budget) -> Result<Vec<Vec<Star>>> {
             })
             .collect()
     })
+}
+
+/// Lateral chromatic aberration from the stars of the first, quarter, middle and last frames.
+fn aberration(
+    store: &Store,
+    found: &[Vec<Star>],
+    camera: &Camera,
+    budget: &Budget,
+) -> Result<(Chroma, chroma::Report)> {
+    use rayon::prelude::*;
+    let (m, n) = (&store.manifest, found.len());
+    let (w, h) = (m.width, m.height);
+    let mut frames = vec![0, n / 4, n / 2, 3 * n / 4, n - 1];
+    frames.dedup();
+    let pool = budget.pool("measuring colour fringes", 0, 2 * (w * h) as u64)?;
+    budget
+        .progress
+        .step("Measuring colour fringes", frames.len());
+    let offsets: Vec<Vec<Offset>> = pool.install(|| {
+        frames
+            .par_iter()
+            .map(|&i| {
+                let samples = store.cfa_rows(i, 0, h)?;
+                let f = &m.frames[i];
+                let raw = Raw {
+                    samples: &samples,
+                    width: w,
+                    height: h,
+                    cfa: &m.cfa,
+                    cfa_width: m.cfa_width,
+                    cfa_height: m.cfa_height,
+                    black: &f.black,
+                    white: f.white,
+                };
+                let o = chroma::offsets(&raw, &found[i], camera);
+                budget.progress.advance()?;
+                Ok(o)
+            })
+            .collect::<Result<_>>()
+    })?;
+    Ok(chroma::fitted(&offsets.concat(), camera.scale()))
 }
 
 pub fn times(store: &Store) -> Vec<f64> {
@@ -149,12 +192,17 @@ pub fn register(store: &Store, lens_from: Option<&Path>, budget: &Budget) -> Res
         .iter()
         .flat_map(|(_, z)| z)
         .any(|z| z.zone == "center" && z.median_px.is_some_and(|m| m > DRIFT_CENTRE_PX));
+    let (colour, aberration) = aberration(store, &found, &fixed.camera, budget)?;
     let (model, held_free) = if drift {
         let free = free_rotations(&fixed, &found, &tracks, reference)?;
         let held = reports(&free, &found, &tracks, &names)?;
         (free, held)
     } else {
         (fixed.clone(), Vec::new())
+    };
+    let model = SkyModel {
+        chroma: colour,
+        ..model
     };
     let counts = {
         let mut c: Vec<usize> = found.iter().map(Vec::len).collect();
@@ -176,6 +224,7 @@ pub fn register(store: &Store, lens_from: Option<&Path>, budget: &Budget) -> Res
         held_out: held,
         drift,
         held_out_free: held_free,
+        chromatic_aberration: aberration,
         seconds: [
             detected,
             tracked,

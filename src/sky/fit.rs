@@ -177,5 +177,6 @@ pub fn fit(
         angles,
         reference,
         rotations: None,
+        chroma: super::chroma::Chroma::NONE,
     })
 }
