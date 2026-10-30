@@ -16,6 +16,12 @@ use pictor_engine::{Result, command, error};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+/// mimalloc reuses freed pages; with macOS's allocator, page faults on each frame's large
+/// buffers took a third of a run.
+#[cfg(target_os = "macos")]
+#[global_allocator]
+static ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 const USAGE: &str = "usage: pictor [FOLDER] [--demo yes] [--scene FILE] [--step NAME] [--mp 45] [--gpu NAME] [--hdr no] \
                      [--bench-window SECONDS | --bench-offscreen WxH | --save-scene FILE | --screenshot FILE]";
 

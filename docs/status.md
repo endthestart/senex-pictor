@@ -47,7 +47,13 @@ HDR output, settings, menu bar, side-by-side results).
   colour check made ground. The sequence check is a quarter faster with identical output (BWCA
   591 files: 86 s → 65 s); ingest and store reads use less CPU with byte-identical stores, but
   ingest here is bound by the data volume's writes (133 MB/s, 92% full). Recent folders, a
-  packaging script (`tools/package-macos.sh`) and Linux/Windows compile checks.
+  packaging script (`tools/package-macos.sh`) and Linux/Windows compile checks. Then, with
+  byte-identical outputs throughout: the matte's filters run on every core, `sky.planes` keeps
+  only the sky's colours, the feature image's median filter keeps a running histogram, each
+  frame's tracking pyramid is built once, and macOS builds use mimalloc, which reuses freed
+  pages rather than faulting them in again. BWCA, 36 frames: 154 s → 79 s (the folder's
+  sequence check 55 → 23 s, separation 25 → 17 s, stack 38 → 19 s). Peak memory rises
+  (10.4 → 13.9 GB unconstrained), but a run held to `--memory 8` peaks at 6.2 GB.
 - Desktop app, all six steps (2026-10-27): Import checks a RAW folder in the background
   (thumbnails made during the sequence check), chooses runs and frames, checks lens profile,
   colour matrix, memory and disk before writing, and runs `process` with live progress, time
