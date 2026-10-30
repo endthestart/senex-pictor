@@ -85,6 +85,13 @@ impl Pictor {
                 }
             }
             Workspace::Open(s) => {
+                if let (Some((step, error)), Some(run)) = (s.reopen.take(), &s.run) {
+                    let out = run.out.clone();
+                    self.next = step;
+                    self.open(out);
+                    self.error = error;
+                    return;
+                }
                 if let (Some(result), Some(run)) = (s.scene.open.take(), &s.run) {
                     let out = run.out.clone();
                     self.next = Step::Compare;

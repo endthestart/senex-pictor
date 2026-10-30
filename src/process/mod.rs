@@ -4,6 +4,7 @@
 //! working store, the sequence check and every stage's report stay in the output folder; a run
 //! that was cancelled or failed resumes there.
 
+mod correct;
 pub mod disk;
 pub mod journal;
 
@@ -13,6 +14,7 @@ use crate::render::Look;
 use crate::sequence::Survey;
 use crate::store::planes;
 use crate::{Result, error, gpu::Gpu, register, review, separate, store};
+pub use correct::correct;
 use journal::Journal;
 pub use journal::{Report, Stage};
 use serde::Serialize;
@@ -34,6 +36,8 @@ pub struct Options<'a> {
     pub gpu: Option<&'a Gpu>,
     pub matrix: Option<&'a Path>,
     pub look: Look,
+    /// Separation draws the matte onward again from its saved statistics (after corrections).
+    pub rematte: bool,
 }
 
 /// Foreground moving more than this (px) over the sequence puts trees in different places in
@@ -208,7 +212,11 @@ pub fn process(o: &Options, survey: &Survey, budget: &Budget) -> Result<Report> 
     let store = store::Store::open(&o.out.join("store"))?;
     log.record("register", || register::register(&store, None, budget))?;
     log.record("separate", || {
-        separate::separate(&store, o.labels, o.lens, budget)
+        if o.rematte {
+            separate::rematte(&store, o.labels, o.lens, budget)
+        } else {
+            separate::separate(&store, o.labels, o.lens, budget)
+        }
     })?;
     let frame = |name: &str| {
         store

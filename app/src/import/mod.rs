@@ -11,7 +11,7 @@ mod view;
 
 pub use checks::Checks;
 pub use lookups::Lookups;
-pub use running::stage_label;
+pub use running::{job_card, stage_label};
 
 use crate::job::Job;
 use crate::thumbs::Thumbs;
@@ -239,6 +239,7 @@ impl Import {
                     gpu: None,
                     matrix: None,
                     look: render::NATURAL,
+                    rematte: false,
                 },
                 &survey,
                 &budget,

@@ -8,6 +8,7 @@ use crate::screens::frames::Frames;
 use crate::screens::look::LookStep;
 use crate::screens::scene::SceneStep;
 use crate::screens::sky::Sky;
+use crate::shell::Step;
 use crate::thumbs::Thumbs;
 use crate::viewer::Viewer;
 use pictor_engine::Result;
@@ -23,6 +24,8 @@ pub struct Session {
     pub sky: Sky,
     pub scene: SceneStep,
     pub look: LookStep,
+    /// The run's folder to open again (it changed), on this step, with what went wrong.
+    pub reopen: Option<(Step, Option<String>)>,
 }
 
 impl Session {
@@ -48,6 +51,7 @@ impl Session {
                 typical.unwrap_or(r.survey.captures.len() / 2),
             )
         });
+        let sky = Sky::new(loaded.run.as_ref());
         Ok(Session {
             name: loaded.name,
             run: loaded.run,
@@ -56,9 +60,10 @@ impl Session {
             viewer,
             compare,
             frames: Frames::default(),
-            sky: Sky::default(),
+            sky,
             scene: SceneStep::default(),
             look: LookStep::default(),
+            reopen: None,
         })
     }
 
@@ -71,6 +76,10 @@ impl Session {
         {
             self.scene.open = Some(made);
         }
+        if let Some(result) = self.sky.applying.as_ref().and_then(|job| job.poll()) {
+            self.sky.applying = None;
+            self.reopen = Some((Step::Sky, result.err().map(|e| e.to_string())));
+        }
         if self.busy() {
             ctx.request_repaint_after(std::time::Duration::from_millis(150));
         }
@@ -79,6 +88,7 @@ impl Session {
     /// Whether something is being made or read in the background.
     pub fn busy(&self) -> bool {
         self.scene.making.is_some()
+            || self.sky.applying.is_some()
             || self.scene.loading()
             || self.look.exporting()
             || self.frames.loading()

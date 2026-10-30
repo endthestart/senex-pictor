@@ -3,22 +3,21 @@
 //! Confirmed star transits mark sky; brightness against a sky background fitted to transit
 //! pixels (then refitted with featureless near-clear pixels) gives fractional coverage;
 //! values within 3σ of 0 or 1 snap, as do near-clear pixels in clear neighbourhoods. Motion
-//! outranks brightness: a part-sky pixel with no transit within the local transit gap is
-//! ground (lit foliage, pale bark), as are dark segments there when segments are given.
+//! outranks brightness (`evidence`): a part-sky pixel with no transit within the local transit
+//! gap is ground (dark foliage, pale bark), as are dark segments there when segments are
+//! given, and so is light of its own colour where no star crosses (leaves under a lamp).
 //! Ground islands up to MAX_GROUND_ISLAND pixels (demosaic artefacts of hot pixels) become sky.
 
-use super::filters::{components, dilate, distance_squared, erode, median, open, uniform};
+use super::evidence::{gaps, lit, near_transits};
+use super::filters::{components, dilate, erode, median, open, uniform};
 use super::grid::{fill_nearest, gaussian, resize};
-use super::stats::{Stats, percentile};
+use super::stats::Stats;
 use crate::{Result, error};
 use serde::Serialize;
 
 pub const TRANSIT_MIN: f32 = 0.003;
-pub const NEAR_RADIUS_PX: f64 = 6.0;
-pub const MAX_GAP_PX: f64 = 32.0;
 pub const MAX_GROUND_ISLAND: usize = 16;
 const BACKGROUND_CELL: usize = 16;
-const GAP_BLOCK: usize = 128;
 const UNSTABLE_FACTOR: f32 = 1.5;
 
 pub struct Matte {
@@ -26,6 +25,8 @@ pub struct Matte {
     pub seen: Vec<bool>,
     /// Mostly-ground pixels whose scatter shows moving foliage or changing light.
     pub unstable: Vec<bool>,
+    /// Light of its own colour where no star crosses, made ground (`evidence::lit`).
+    pub lit: Vec<bool>,
     pub report: MatteReport,
 }
 
@@ -39,6 +40,7 @@ pub struct MatteReport {
     pub ground_islands_to_sky_pixels: usize,
     pub conflict_pixels: usize,
     pub unstable_pixels: usize,
+    pub lit_pixels: usize,
     pub segments: usize,
 }
 
@@ -96,52 +98,6 @@ fn brightness(
     Ok((ground_level, alpha, noise))
 }
 
-/// Per pixel the 99th-percentile distance to the nearest transit over the brightness-clear
-/// pixels of its GAP_BLOCK block (sparse blocks take the nearest block's), log-smoothed; none
-/// without brightness-clear sky.
-fn transit_gaps(gap: &[f64], clear: &[bool], w: usize, h: usize) -> Option<Vec<f32>> {
-    let b = GAP_BLOCK;
-    let (gw, gh) = (w.div_ceil(b), h.div_ceil(b));
-    let mut cells = Vec::with_capacity(gw * gh);
-    for j in 0..gh {
-        for i in 0..gw {
-            let mut v: Vec<f32> = (j * b..((j + 1) * b).min(h))
-                .flat_map(|y| (i * b..((i + 1) * b).min(w)).map(move |x| y * w + x))
-                .filter(|&p| clear[p])
-                .map(|p| gap[p] as f32)
-                .collect();
-            cells.push(
-                (v.len() as f64 >= 0.05 * (b * b) as f64)
-                    .then(|| f64::from(percentile(&mut v, 99.0))),
-            );
-        }
-    }
-    let filled = fill_nearest(&cells, gw, gh)?;
-    let logs: Vec<f64> = filled.iter().map(|v| v.max(NEAR_RADIUS_PX).ln()).collect();
-    let up = resize(&gaussian(&logs, gw, gh, 1.0, true), gw, gh, gw * b, gh * b);
-    Some(
-        (0..w * h)
-            .map(|p| up[(p / w) * gw * b + p % w].exp())
-            .collect(),
-    )
-}
-
-/// Whether each pixel lies within the local transit gap of a transit (everywhere where gaps
-/// exceed MAX_GAP_PX or no transit was seen: sparse skies keep their brightness matte).
-fn near_transits(seen: &[bool], alpha: &[f32], w: usize, h: usize) -> Vec<bool> {
-    let Some((gap2, _)) = distance_squared(seen, w, h) else {
-        return vec![true; w * h];
-    };
-    let gap: Vec<f64> = gap2.iter().map(|d| d.sqrt()).collect();
-    let clear: Vec<bool> = alpha.iter().map(|&a| a >= 0.98).collect();
-    let Some(radius) = transit_gaps(&gap, &clear, w, h) else {
-        return vec![true; w * h];
-    };
-    (0..w * h)
-        .map(|p| gap[p] <= f64::from(radius[p]) || f64::from(radius[p]) > MAX_GAP_PX)
-        .collect()
-}
-
 /// The matte from temporal statistics; `labels` (one segment id per pixel, 0 = none) are
 /// optional segments.
 pub fn matte(stats: &Stats, frames: usize, labels: Option<&[u32]>) -> Result<Matte> {
@@ -173,9 +129,11 @@ pub fn matte(stats: &Stats, frames: usize, labels: Option<&[u32]>) -> Result<Mat
         })
         .collect();
     let mut ground: Vec<bool> = (0..w * h).map(|p| alpha[p] <= 3.0 * noise[p]).collect();
-    let near = near_transits(&seen, &alpha, w, h);
+    let gap = gaps(&seen, w, h);
+    let near = near_transits(gap.as_deref(), &alpha, w, h);
+    let lit = lit(stats, &seen, gap.as_deref());
     for p in 0..w * h {
-        ground[p] |= !near[p] && !clear[p] && stats.resolvable[p];
+        ground[p] |= (!near[p] && !clear[p] || lit[p]) && stats.resolvable[p];
     }
     let mut segments = 0;
     if let Some(labels) = labels {
@@ -243,12 +201,14 @@ pub fn matte(stats: &Stats, frames: usize, labels: Option<&[u32]>) -> Result<Mat
         ground_islands_to_sky_pixels: islands,
         conflict_pixels: (0..w * h).filter(|&p| seen[p] && snapped[p] < 0.2).count(),
         unstable_pixels: unstable.iter().filter(|&&u| u).count(),
+        lit_pixels: lit.iter().filter(|&&l| l).count(),
         segments,
     };
     Ok(Matte {
         alpha: snapped,
         seen,
         unstable,
+        lit,
         report,
     })
 }

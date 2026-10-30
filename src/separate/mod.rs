@@ -1,7 +1,11 @@
 //! Sky and foreground separation of a registered store (ADR 0009): temporal statistics with
-//! sky-coherent transits, the matte, camera-fixed glow and per-frame occlusion.
+//! sky-coherent transits, the matte (with the owner's corrections laid over), camera-fixed glow
+//! and per-frame occlusion. After corrections the matte onward is drawn again from the saved
+//! statistics (`rematte`).
 
 pub mod cells;
+pub mod corrections;
+pub mod evidence;
 pub mod filters;
 pub mod glow;
 pub mod grid;
@@ -50,9 +54,59 @@ pub struct Report {
     pub vignetting: Vignetting,
     pub unresolvable_pole_pixels: usize,
     pub matte: matte::MatteReport,
+    /// Pixels the owner painted as sky or ground.
+    pub corrected_pixels: usize,
     pub glow_iteration_rms_change_adu: Vec<f64>,
     pub occluded_share_percentiles: [f64; 4],
     pub seconds: [f64; 4],
+}
+
+const STATS: &str = "stats.planes";
+const STATS_PLANES: [&str; 9] = [
+    "median",
+    "low",
+    "sigma",
+    "excess",
+    "transit",
+    "scatter",
+    "resolvable",
+    "red",
+    "blue",
+];
+
+fn save_stats(store: &Store, s: &stats::Stats) -> Result<()> {
+    let resolvable = planes::bools(&s.resolvable);
+    let values: [&[f32]; 9] = [
+        &s.median,
+        &s.low,
+        &s.sigma,
+        &s.excess,
+        &s.transit,
+        &s.scatter,
+        &resolvable,
+        &s.red,
+        &s.blue,
+    ];
+    let named: Vec<(&str, &[f32])> = STATS_PLANES.into_iter().zip(values).collect();
+    planes::save(&store.dir.join(STATS), s.width, s.height, &named)
+}
+
+fn load_stats(store: &Store) -> Result<stats::Stats> {
+    let p = planes::load(&store.dir.join(STATS))?;
+    let get = |name: &str| -> Result<Vec<f32>> { Ok(p.get(name)?.to_vec()) };
+    Ok(stats::Stats {
+        width: p.width,
+        height: p.height,
+        median: get("median")?,
+        low: get("low")?,
+        sigma: get("sigma")?,
+        excess: get("excess")?,
+        transit: get("transit")?,
+        scatter: get("scatter")?,
+        resolvable: p.get("resolvable")?.iter().map(|&v| v > 0.5).collect(),
+        red: get("red")?,
+        blue: get("blue")?,
+    })
 }
 
 /// Separates the store in place: `stats.planes`, `matte.planes`, `glow.planes`, `occ/` and
@@ -63,32 +117,46 @@ pub fn separate(
     lens: Option<&str>,
     budget: &Budget,
 ) -> Result<Report> {
+    let clock = std::time::Instant::now();
+    let model = model(store)?;
+    let field = flat(store, lens)?;
+    let n = store.manifest.frames.len();
+    let s = stats::temporal_stats(store, &model, 0..n, budget)?;
+    save_stats(store, &s)?;
+    from_stats(store, &model, &s, labels, field, clock, budget)
+}
+
+/// The matte, glow and occlusion drawn again from the saved statistics, after corrections.
+pub fn rematte(
+    store: &Store,
+    labels: Option<&[u32]>,
+    lens: Option<&str>,
+    budget: &Budget,
+) -> Result<Report> {
+    let clock = std::time::Instant::now();
+    let field = flat(store, lens)?;
+    let s = load_stats(store)?;
+    from_stats(store, &model(store)?, &s, labels, field, clock, budget)
+}
+
+fn from_stats(
+    store: &Store,
+    model: &SkyModel,
+    s: &stats::Stats,
+    labels: Option<&[u32]>,
+    (flat, vignetting): (Vec<f32>, Vignetting),
+    clock: std::time::Instant,
+    budget: &Budget,
+) -> Result<Report> {
     let (w, h, n) = (
         store.manifest.width,
         store.manifest.height,
         store.manifest.frames.len(),
     );
-    let clock = std::time::Instant::now();
-    let model = model(store)?;
-    let (flat, vignetting) = flat(store, lens)?;
-    let s = stats::temporal_stats(store, &model, 0..n, budget)?;
-    planes::save(
-        &store.dir.join("stats.planes"),
-        w,
-        h,
-        &[
-            ("median", &s.median),
-            ("low", &s.low),
-            ("sigma", &s.sigma),
-            ("excess", &s.excess),
-            ("transit", &s.transit),
-            ("scatter", &s.scatter),
-            ("resolvable", &planes::bools(&s.resolvable)),
-        ],
-    )?;
     let t_stats = clock.elapsed().as_secs_f64();
     budget.progress.step("Drawing the sky and ground", 0);
-    let m = matte::matte(&s, n, labels)?;
+    let mut m = matte::matte(s, n, labels)?;
+    let corrected = corrections::correct(store, &mut m.alpha)?;
     planes::save(
         &store.dir.join("matte.planes"),
         w,
@@ -97,11 +165,12 @@ pub fn separate(
             ("alpha", &m.alpha),
             ("seen", &planes::bools(&m.seen)),
             ("unstable", &planes::bools(&m.unstable)),
+            ("lit", &planes::bools(&m.lit)),
         ],
     )?;
     let t_matte = clock.elapsed().as_secs_f64() - t_stats;
     let (medians, _) = glow::block_medians(store, &m.alpha, &flat, None, budget)?;
-    let (glow, _, changes) = glow::decompose(&medians, &model, &vec![true; n])?;
+    let (glow, _, changes) = glow::decompose(&medians, model, &vec![true; n])?;
     save_glow(store, &glow)?;
     let t_glow = clock.elapsed().as_secs_f64() - t_stats - t_matte;
     let mut shares = occlusion::build(store, &glow, &m.alpha, &flat, budget)?;
@@ -111,6 +180,7 @@ pub fn separate(
         vignetting,
         unresolvable_pole_pixels: s.resolvable.iter().filter(|&&r| !r).count(),
         matte: m.report,
+        corrected_pixels: corrected,
         glow_iteration_rms_change_adu: changes,
         occluded_share_percentiles: [q(10.0), q(50.0), q(90.0), q(100.0)],
         seconds: [

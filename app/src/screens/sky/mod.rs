@@ -1,31 +1,71 @@
 //! The Sky & ground step (design board 3): the result with the sky tinted blue and the
-//! uncertain boundary orange (O toggles the overlay), and what the separation found: how much
-//! is clear sky, ground and boundary, how often the ground hid the sky, the lens profile used,
-//! and, when the camera drifted, where the mask came from.
+//! uncertain boundary orange (O toggles the overlay), corrections painted over it and applied
+//! in the background, and what the separation found: how much is clear sky, ground and
+//! boundary, how often the ground hid the sky, the lens profile used, and, when the camera
+//! drifted, where the mask came from.
 
+pub mod brush;
+
+use crate::import::job_card;
+use crate::job::Job;
 use crate::project::Run;
 use crate::session::Session;
 use crate::shell::{State, Step, StepRow};
 use crate::theme::{MUTED, WARN};
 use crate::viewer::{Canvas, Viewer};
 use crate::widgets::{self, card, key, section, strong};
+use brush::{Brush, RADIUS_RANGE, Tool};
 use egui::{Color32, CornerRadius, RichText, Sense, Ui, vec2};
+use pictor_engine::budget::Budget;
+use pictor_engine::process;
+use pictor_engine::separate::corrections;
+use pictor_engine::store::Store;
 
 const SKY: Color32 = Color32::from_rgb(60, 111, 191);
 const EDGE: Color32 = Color32::from_rgb(240, 160, 64);
 
 pub struct Sky {
     pub canvas: Canvas,
+    pub brush: Brush,
+    /// Corrections being applied: the run again from its matte on.
+    pub applying: Option<Job<process::Report>>,
+    pub error: Option<String>,
 }
 
-impl Default for Sky {
-    fn default() -> Sky {
+impl Sky {
+    /// The step for `run`, with the corrections its store holds.
+    pub fn new(run: Option<&Run>) -> Sky {
+        let (saved, error) = match run.map(|r| corrections::load(&r.store)) {
+            Some(Ok(strokes)) => (strokes, None),
+            Some(Err(e)) => (Vec::new(), Some(e.to_string())),
+            None => (Vec::new(), None),
+        };
         Sky {
             canvas: Canvas {
                 overlay: true,
                 ..Canvas::single(false)
             },
+            brush: Brush::new(saved),
+            applying: None,
+            error,
         }
+    }
+
+    /// Saves the strokes to the store and does the run again from its matte on.
+    fn apply(&mut self, run: &Run) {
+        let (dir, out, strokes) = (
+            run.store.dir.clone(),
+            run.out.clone(),
+            self.brush.strokes.clone(),
+        );
+        self.brush.tool = Tool::Move;
+        self.error = None;
+        self.applying = Some(Job::start("Applying the corrections", move |progress| {
+            corrections::save(&Store::open(&dir)?, &strokes)?;
+            let mut budget = Budget::from_free()?;
+            budget.progress = progress;
+            process::correct(&out, None, &budget)
+        }));
     }
 }
 
@@ -50,6 +90,9 @@ pub fn keys(ctx: &egui::Context, s: &mut Session) {
     if !ctx.egui_wants_keyboard_input() && ctx.input(|i| i.key_pressed(egui::Key::O)) {
         s.sky.canvas.overlay = !s.sky.canvas.overlay;
     }
+    if s.run.is_some() && s.sky.applying.is_none() {
+        s.sky.brush.keys(ctx);
+    }
 }
 
 fn swatch(ui: &mut Ui, color: Color32, text: &str) {
@@ -65,7 +108,86 @@ fn share(v: &serde_json::Value) -> String {
 
 impl Sky {
     pub fn show(&mut self, ui: &mut Ui, viewer: &mut Viewer) {
-        viewer.canvas(ui, &mut self.canvas);
+        if self.applying.is_some() {
+            self.brush.tool = Tool::Move;
+        }
+        self.canvas.paint = self.brush.tool != Tool::Move;
+        let response = viewer.canvas(ui, &mut self.canvas);
+        self.brush.paint(ui, &response, viewer);
+    }
+
+    fn corrections(&mut self, ui: &mut Ui, run: &Run) {
+        card(ui, |ui| {
+            section(ui, "Corrections");
+            let busy = self.applying.is_some();
+            ui.add_enabled_ui(!busy, |ui| {
+                let tools = [Tool::Move, Tool::Sky, Tool::Ground];
+                let at = tools.iter().position(|&t| t == self.brush.tool);
+                if let Some(k) = widgets::segmented(ui, &["Move", "Paint sky", "Paint ground"], at)
+                {
+                    self.brush.tool = tools[k];
+                }
+                ui.horizontal(|ui| {
+                    ui.label("Brush");
+                    ui.add(
+                        egui::Slider::new(&mut self.brush.radius, RADIUS_RANGE)
+                            .logarithmic(true)
+                            .suffix(" px")
+                            .max_decimals(0),
+                    );
+                });
+                widgets::key_hints(
+                    ui,
+                    &[
+                        ("V S G", "move, sky, ground"),
+                        ("[ ]", "brush size"),
+                        ("⌘Z", "undo"),
+                    ],
+                );
+                ui.horizontal(|ui| {
+                    let some = !self.brush.strokes.is_empty();
+                    if ui.add_enabled(some, egui::Button::new("Undo")).clicked() {
+                        self.brush.strokes.pop();
+                    }
+                    if ui
+                        .add_enabled(some, egui::Button::new("Clear all"))
+                        .clicked()
+                    {
+                        self.brush.strokes.clear();
+                    }
+                });
+            });
+            let pending = self.brush.changed();
+            if pending {
+                ui.label(RichText::new("Not applied yet").color(WARN));
+            }
+            if ui
+                .add_enabled_ui(pending && !busy, |ui| {
+                    widgets::primary(ui, "Apply corrections")
+                })
+                .inner
+                .clicked()
+            {
+                self.apply(run);
+            }
+            ui.label(widgets::muted(
+                "Applying draws the sky and ground again from the night's saved statistics, \
+                 then stacks and renders the result again.",
+            ));
+            if let Some(e) = &self.error {
+                ui.label(RichText::new(e).color(WARN));
+            }
+        });
+        if let Some(job) = &self.applying
+            && job_card(
+                ui,
+                "Applying corrections",
+                job,
+                "Cancelling leaves the run to resume from Import.",
+            )
+        {
+            job.cancel();
+        }
     }
 
     pub fn panel(&mut self, ui: &mut Ui, run: Option<&Run>) {
@@ -93,6 +215,7 @@ impl Sky {
         let Some(run) = run else {
             return;
         };
+        self.corrections(ui, run);
         let Some(sep) = separate(run) else {
             return;
         };
@@ -124,6 +247,23 @@ impl Sky {
                     ))
                     .color(WARN),
                 );
+            }
+            if let Some(lit) = m["lit_pixels"].as_u64()
+                && lit > 0
+            {
+                ui.label(widgets::muted(format!(
+                    "{:.1}% was lit in a colour of its own where no star crossed (a lamp on \
+                     leaves) and became ground; paint sky where that is wrong.",
+                    lit as f64 / pixels * 100.0
+                )));
+            }
+            if let Some(painted) = sep["corrected_pixels"].as_u64()
+                && painted > 0
+            {
+                ui.label(widgets::muted(format!(
+                    "{:.1}% was painted by hand.",
+                    painted as f64 / pixels * 100.0
+                )));
             }
             let occluded = &sep["occluded_share_percentiles"];
             if let Some(median) = occluded[1].as_f64() {

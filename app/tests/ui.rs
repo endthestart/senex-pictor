@@ -259,3 +259,57 @@ fn a_moment_is_made_from_the_scene_step() -> Result<()> {
     save(&opened, "scene-moment-compare.jpg")?;
     Ok(())
 }
+
+/// A drag with the primary button from `from` to `to`, a frame per tenth of the way.
+fn drag(h: &mut Harness<'static, Pictor>, from: [f32; 2], to: [f32; 2]) {
+    let at = |t: f32| {
+        egui::pos2(
+            from[0] + t * (to[0] - from[0]),
+            from[1] + t * (to[1] - from[1]),
+        )
+    };
+    h.hover_at(at(0.0));
+    h.step();
+    h.drag_at(at(0.0));
+    h.step();
+    for k in 1..=10 {
+        h.hover_at(at(k as f32 / 10.0));
+        h.step();
+    }
+    h.drop_at(at(1.0));
+    h.step();
+}
+
+/// Ground painted on Sky & ground is applied in the background and the run reopens there with
+/// the stroke saved (`PICTOR_UI_CORRECT`, a processed folder the test changes; skipped
+/// without it).
+#[test]
+fn a_painted_correction_is_applied_and_the_run_reopens_on_sky() -> Result<()> {
+    let Ok(folder) = std::env::var("PICTOR_UI_CORRECT") else {
+        eprintln!("PICTOR_UI_CORRECT is not set; skipped");
+        return Ok(());
+    };
+    let mut h = harness(Some(PathBuf::from(folder)), None);
+    wait(&mut h, 300, Pictor::opened)?;
+    h.state_mut().show_step(Step::Sky);
+    wait(&mut h, 60, Pictor::idle)?;
+    let saved = |p: &Pictor| p.session().map(|s| s.sky.brush.saved.len());
+    let before = saved(h.state()).ok_or("the folder should open")?;
+    h.key_press(egui::Key::G);
+    h.step();
+    drag(&mut h, [500.0, 300.0], [800.0, 340.0]);
+    let strokes = h.state().session().map_or(0, |s| s.sky.brush.strokes.len());
+    assert_eq!(strokes, before + 1, "the drag should paint one stroke");
+    save(&h.render().map_err(error)?, "sky-painted.jpg")?;
+    h.get_by_label("Apply corrections").click();
+    h.step();
+    assert!(!h.state().idle(), "applying runs in the background");
+    wait(&mut h, 1800, |p| p.idle() && saved(p) == Some(before + 1))?;
+    assert_eq!(
+        h.state().step(),
+        Step::Sky,
+        "the run reopens on Sky & ground"
+    );
+    save(&h.render().map_err(error)?, "sky-corrected.jpg")?;
+    Ok(())
+}

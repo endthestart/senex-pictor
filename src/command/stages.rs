@@ -211,10 +211,17 @@ pub fn process(
             gpu: device.as_ref(),
             matrix: o.get("--matrix").map(Path::new),
             look: look(&o)?,
+            rematte: false,
         },
         &survey,
         budget,
     )
+}
+
+/// `correct OUT_DIR`: the finished run in OUT_DIR again with its store's matte corrections.
+pub fn correct(out: &Path, rest: &[OsString], budget: &Budget) -> Result<crate::process::Report> {
+    let o = flags(rest, &["--gpu"])?;
+    crate::process::correct(out, gpu(&o)?.as_ref(), budget)
 }
 
 pub fn render(dir: &Path, planes: &str, out: &Path, rest: &[OsString]) -> Result<review::Report> {

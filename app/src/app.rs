@@ -110,6 +110,19 @@ impl Pictor {
         matches!(self.workspace, Workspace::Open(_))
     }
 
+    /// The open result, if any.
+    pub fn session(&self) -> Option<&crate::session::Session> {
+        match &self.workspace {
+            Workspace::Open(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    /// The step on screen.
+    pub fn step(&self) -> Step {
+        self.step
+    }
+
     /// Whether the Compare screen is up.
     pub fn comparing(&self) -> bool {
         self.opened() && self.step == Step::Compare

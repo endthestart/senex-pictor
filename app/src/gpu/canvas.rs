@@ -244,13 +244,20 @@ pub fn viewport_px(rect: egui::Rect, ppp: f32) -> [f32; 2] {
 /// The image's quad in a viewport of `size` physical px, at `zoom` physical px per image px,
 /// with image point `centre` in the middle. At whole-number zooms its corner lands on a whole
 /// pixel, so 100% shows each image pixel on one screen pixel.
-pub fn place(size: [f32; 2], image: [f32; 2], zoom: f32, centre: [f32; 2]) -> ([f32; 2], [f32; 2]) {
-    let mut left = size[0] / 2.0 - centre[0] * zoom;
-    let mut top = size[1] / 2.0 - centre[1] * zoom;
+/// Where the image's top-left corner falls in a viewport of `size` physical px (whole pixels
+/// at whole zooms, so 100% stays sharp).
+pub fn origin(size: [f32; 2], zoom: f32, centre: [f32; 2]) -> [f32; 2] {
+    let left = size[0] / 2.0 - centre[0] * zoom;
+    let top = size[1] / 2.0 - centre[1] * zoom;
     if zoom.fract() == 0.0 {
-        left = left.round();
-        top = top.round();
+        [left.round(), top.round()]
+    } else {
+        [left, top]
     }
+}
+
+pub fn place(size: [f32; 2], image: [f32; 2], zoom: f32, centre: [f32; 2]) -> ([f32; 2], [f32; 2]) {
+    let [left, top] = origin(size, zoom, centre);
     let (right, bottom) = (left + image[0] * zoom, top + image[1] * zoom);
     let x = |px: f32| px / size[0] * 2.0 - 1.0;
     let y = |px: f32| 1.0 - px / size[1] * 2.0;

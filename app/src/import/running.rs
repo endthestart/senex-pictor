@@ -2,6 +2,7 @@
 //! or stopped (what finished, Resume).
 
 use super::Import;
+use crate::job::Job;
 use crate::theme::{MUTED, WARN};
 use crate::widgets::{self, Icon, card, duration, section, strong};
 use egui::{RichText, Ui};
@@ -62,60 +63,71 @@ fn stages(ui: &mut Ui, s: &Snapshot) {
     }
 }
 
+/// A background run's card: progress, each stage, the current step, Cancel and `note`;
+/// whether Cancel was clicked.
+pub fn job_card<T: Send + 'static>(ui: &mut Ui, title: &str, job: &Job<T>, note: &str) -> bool {
+    let s = job.snapshot();
+    let elapsed = job.started.elapsed().as_secs_f64();
+    let cancelling = job.cancelled();
+    let mut cancel = false;
+    card(ui, |ui| {
+        ui.horizontal(|ui| {
+            section(ui, title);
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.label(widgets::muted(format!("{} so far", duration(elapsed))));
+            });
+        });
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            ui.label(
+                RichText::new(format!("{:.0}%", s.fraction * 100.0))
+                    .font(crate::theme::semibold(28.0)),
+            );
+            if let Some(r) = s.remaining_s {
+                ui.label(widgets::muted(format!("about {} left", duration(r))));
+            }
+        });
+        widgets::bar(ui, s.fraction as f32, 6.0);
+        ui.add_space(8.0);
+        stages(ui, &s);
+        if let Some(step) = &s.step {
+            ui.add_space(6.0);
+            let count = if s.total > 0 {
+                format!(" · {} of {}", s.done, s.total)
+            } else {
+                String::new()
+            };
+            ui.label(widgets::muted(format!("{step}{count}")));
+            if s.total > 0 {
+                widgets::bar(ui, s.done as f32 / s.total as f32, 4.0);
+            }
+        }
+        ui.add_space(10.0);
+        if cancelling {
+            ui.label(RichText::new("Stopping at the next frame…").color(WARN));
+        } else {
+            cancel = widgets::secondary(ui, "Cancel").clicked();
+        }
+        ui.label(widgets::muted(note));
+    });
+    cancel
+}
+
 impl Import {
     /// The running run's card, with Cancel.
     pub(super) fn run_card(&mut self, ui: &mut Ui) {
-        let Some(job) = &self.processing else {
-            return;
-        };
-        let s = job.snapshot();
-        let elapsed = job.started.elapsed().as_secs_f64();
-        let cancelling = job.cancelled();
-        card(ui, |ui| {
-            ui.horizontal(|ui| {
-                section(ui, "Processing");
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(widgets::muted(format!("{} so far", duration(elapsed))));
-                });
-            });
-            ui.add_space(4.0);
-            ui.horizontal(|ui| {
-                ui.label(
-                    RichText::new(format!("{:.0}%", s.fraction * 100.0))
-                        .font(crate::theme::semibold(28.0)),
-                );
-                if let Some(r) = s.remaining_s {
-                    ui.label(widgets::muted(format!("about {} left", duration(r))));
-                }
-            });
-            widgets::bar(ui, s.fraction as f32, 6.0);
-            ui.add_space(8.0);
-            stages(ui, &s);
-            if let Some(step) = &s.step {
-                ui.add_space(6.0);
-                let count = if s.total > 0 {
-                    format!(" · {} of {}", s.done, s.total)
-                } else {
-                    String::new()
-                };
-                ui.label(widgets::muted(format!("{step}{count}")));
-                if s.total > 0 {
-                    widgets::bar(ui, s.done as f32 / s.total as f32, 4.0);
-                }
-            }
-            ui.add_space(10.0);
-            if cancelling {
-                ui.label(RichText::new("Stopping at the next frame…").color(WARN));
-            } else if widgets::secondary(ui, "Cancel").clicked() {
-                self.cancel();
-            }
-            ui.label(widgets::muted(
+        if let Some(job) = &self.processing
+            && job_card(
+                ui,
+                "Processing",
+                job,
                 "Cancelling keeps what is done; the run can resume later from this folder.",
-            ));
-        });
+            )
+        {
+            self.cancel();
+        }
     }
 
-    /// What an interrupted run finished, with Resume.
     pub(super) fn interrupted_card(&mut self, ui: &mut Ui) -> bool {
         let Some(r) = &self.interrupted else {
             return false;

@@ -49,9 +49,10 @@ fn clipping_drops_a_satellite_trail_and_keeps_the_noise() {
     assert!((mean[1] - 20.0).abs() < 1e-4);
 }
 
-/// Sky in the upper half with star transits everywhere and one dead pixel, a dark tree trunk
-/// through it, a half-covered row along its lower edge, dark ground in the lower half and a
-/// bright patch there without transits (lit bark).
+/// Sky in the upper half with star transits everywhere but two patches and one dead pixel, a
+/// dark tree trunk through it, a half-covered row along its lower edge, dark ground in the
+/// lower half and a bright patch there without transits (lit bark). Of the two sky patches
+/// no star crosses, one is lit red (leaves under a lamp), the other has the sky's colour.
 fn scene() -> Stats {
     let (w, h) = (96, 64);
     let p = |f: &dyn Fn(usize, usize) -> f32| -> Vec<f32> {
@@ -59,6 +60,9 @@ fn scene() -> Stats {
     };
     let sky =
         |x: usize, y: usize| (y < 32 && !(40..48).contains(&x) || y < 8) && (x, y) != (10, 20);
+    let lamp = |x: usize, y: usize| (14..38).contains(&x) && (8..30).contains(&y);
+    let starless = |x: usize, y: usize| (54..78).contains(&x) && (8..30).contains(&y);
+    let crossed = move |x: usize, y: usize| sky(x, y) && !lamp(x, y) && !starless(x, y);
     let level = |x: usize, y: usize| {
         if sky(x, y) {
             1000.0
@@ -76,10 +80,12 @@ fn scene() -> Stats {
         median: p(&level),
         low: p(&level),
         sigma: p(&|_, _| 20.0),
-        excess: p(&|x, y| if sky(x, y) { 0.02 } else { 0.0 }),
-        transit: p(&|x, y| if sky(x, y) { 0.02 } else { 0.0 }),
+        excess: p(&|x, y| if crossed(x, y) { 0.02 } else { 0.0 }),
+        transit: p(&|x, y| if crossed(x, y) { 0.02 } else { 0.0 }),
         scatter: p(&|_, _| 20.0),
         resolvable: vec![true; w * h],
+        red: p(&|x, y| if lamp(x, y) { 0.6 } else { 0.3 }),
+        blue: p(&|x, y| if lamp(x, y) { 0.15 } else { 0.3 }),
     }
 }
 
@@ -90,6 +96,17 @@ fn the_matte_is_sky_where_stars_cross_and_ground_where_dark() -> Result<()> {
     let m = matte(&s, 50, None)?;
     let at = |x: usize, y: usize| m.alpha[y * w + x];
     assert_eq!(at(10, 10), 1.0, "clear sky");
+    assert_eq!(
+        at(26, 18),
+        0.0,
+        "light of its own colour where no star crosses"
+    );
+    assert_eq!(at(66, 18), 1.0, "starless sky of the sky's colour");
+    assert_eq!(
+        at(15, 18),
+        0.0,
+        "lit pixels beside the transits go with their core"
+    );
     assert_eq!(at(44, 20), 0.0, "the trunk between sky");
     assert_eq!(at(5, 60), 0.0, "dark ground");
     assert_eq!(
@@ -119,4 +136,33 @@ fn the_matte_is_sky_where_stars_cross_and_ground_where_dark() -> Result<()> {
         "motion outranks brightness inside a dark segment"
     );
     Ok(())
+}
+
+#[test]
+fn painted_strokes_override_the_matte_later_over_earlier() {
+    use pictor_engine::separate::corrections::{Stroke, apply, force};
+    let (w, h) = (40, 20);
+    let strokes = [
+        Stroke {
+            sky: true,
+            radius: 3.0,
+            points: vec![[10.0, 10.0], [30.0, 10.0]],
+        },
+        Stroke {
+            sky: false,
+            radius: 2.0,
+            points: vec![[20.0, 10.0]],
+        },
+    ];
+    let f = force(&strokes, w, h);
+    let at = |x: usize, y: usize| f[y * w + x];
+    assert_eq!(at(14, 12), 1, "inside the sky stroke");
+    assert_eq!(at(14, 14), 0, "beyond its radius");
+    assert_eq!(at(20, 10), -1, "the later ground dab wins");
+    let mut alpha = vec![0.5; w * h];
+    assert_eq!(apply(&mut alpha, &f), f.iter().filter(|&&v| v != 0).count());
+    assert_eq!(
+        (alpha[12 * w + 14], alpha[10 * w + 20], alpha[0]),
+        (1.0, 0.0, 0.5)
+    );
 }

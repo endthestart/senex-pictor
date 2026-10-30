@@ -95,7 +95,8 @@ pub fn hero(store: &Store, o: &Options, budget: &Budget) -> Result<Report> {
     let w1 = (hero.saturating_sub(WINDOW / 2) + WINDOW).min(n);
     let w0 = w1.saturating_sub(WINDOW);
     let s = stats::temporal_stats(store, &fixed, w0..w1, budget)?;
-    let mt = matte::matte(&s, w1 - w0, labels)?;
+    let mut mt = matte::matte(&s, w1 - w0, labels)?;
+    crate::separate::corrections::correct(store, &mut mt.alpha)?;
     let alpha = mt.alpha;
     let ground: Vec<bool> = alpha.iter().map(|&a| a <= 0.5).collect();
     let used: Vec<usize> = (first..n).collect();

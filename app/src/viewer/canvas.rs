@@ -22,6 +22,8 @@ pub struct Canvas {
     pub overlay: bool,
     /// A/B name tags.
     pub tags: bool,
+    /// A brush paints with the primary button; the others (or Space) pan.
+    pub paint: bool,
     /// Uniform slot (0 for the main canvas).
     pub slot: u64,
 }
@@ -33,6 +35,7 @@ impl Canvas {
             split: None,
             overlay: false,
             tags: false,
+            paint: false,
             slot: 0,
         }
     }
@@ -80,7 +83,15 @@ impl Viewer {
             }
         }
         let z = self.zoom_factor(size);
-        if response.dragged() {
+        let space = ctx.input(|i| i.key_down(egui::Key::Space));
+        let pan = if c.paint {
+            response.dragged_by(egui::PointerButton::Secondary)
+                || response.dragged_by(egui::PointerButton::Middle)
+                || (space && response.dragged())
+        } else {
+            response.dragged()
+        };
+        if pan {
             let d = response.drag_delta() * ppp / z;
             self.centre = [self.centre[0] - d.x, self.centre[1] - d.y];
         }
@@ -144,6 +155,46 @@ impl Viewer {
             format!("{:.0}%", z * 100.0),
         );
         response
+    }
+
+    /// Physical px per rendering px, and where the rendering's top-left corner falls (physical
+    /// px from the canvas's), on a canvas over `rect`.
+    fn placement(&self, rect: Rect, ppp: f32) -> (f32, [f32; 2]) {
+        let size = canvas::viewport_px(rect, ppp);
+        let z = self.zoom_factor(size);
+        (z, canvas::origin(size, z, self.centre))
+    }
+
+    fn scene_per_rendering(&self) -> [f32; 2] {
+        [
+            self.scene.width as f32 / self.size[0] as f32,
+            self.scene.height as f32 / self.size[1] as f32,
+        ]
+    }
+
+    /// The scene pixel under screen point `pos` of a canvas over `rect`.
+    pub fn scene_at(&self, rect: Rect, ppp: f32, pos: egui::Pos2) -> [f32; 2] {
+        let (z, o) = self.placement(rect, ppp);
+        let k = self.scene_per_rendering();
+        [
+            ((pos.x - rect.min.x) * ppp - o[0]) / z * k[0],
+            ((pos.y - rect.min.y) * ppp - o[1]) / z * k[1],
+        ]
+    }
+
+    /// The screen point of scene pixel `p` on a canvas over `rect`.
+    pub fn screen_at(&self, rect: Rect, ppp: f32, p: [f32; 2]) -> egui::Pos2 {
+        let (z, o) = self.placement(rect, ppp);
+        let k = self.scene_per_rendering();
+        egui::pos2(
+            rect.min.x + (o[0] + p[0] / k[0] * z) / ppp,
+            rect.min.y + (o[1] + p[1] / k[1] * z) / ppp,
+        )
+    }
+
+    /// Screen points per scene pixel on a canvas over `rect`.
+    pub fn points_per_scene(&self, rect: Rect, ppp: f32) -> f32 {
+        self.placement(rect, ppp).0 / self.scene_per_rendering()[0] / ppp
     }
 
     /// Rendering `k` around `centre` (rendering px) at `zoom` physical px per px, in a square

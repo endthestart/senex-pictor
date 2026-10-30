@@ -37,7 +37,8 @@ in the background (runs, lit and overexposed frames, thumbnails), lets you choos
 checks lens, colour, memory and disk before anything is written, then processes with live
 progress, Cancel and Resume (a cancelled or failed run continues from its last finished
 stage). **Frames** shows why each frame was used (lit, lost, drift per frame, blink against
-the reference); **Sky & ground** tints the sky and the boundary over the result (O);
+the reference); **Sky & ground** tints the sky and the boundary over the result (O) and
+takes corrections painted as sky or ground (S, G), applied in the background;
 **Scene** makes a hero frame or a short-window moment and opens it; **Compare** keeps two
 renderings on the GPU (Space swaps in place, S splits, chosen regions as 200% crops with
 A / same / B verdicts saved to `compare.json`); **Look & export** tunes the look live and
@@ -46,6 +47,10 @@ run `cargo run --release -p pictor -- [FOLDER] [--step NAME]`.
 `cargo test -p pictor` renders the window headlessly (`PICTOR_UI_SHOTS=DIR`
 saves the frames; `PICTOR_UI_FOLDER`, `PICTOR_UI_RAW` and `PICTOR_UI_STOPPED`
 point the screen tests at a processed folder, a RAW folder and a stopped run).
+
+`correct OUTPUT_DIR [--gpu yes|NAME]` runs a finished run again from its matte with the
+corrections in its store (`store/corrections.json`, the strokes the app paints), reusing the
+saved statistics.
 
 `process` itself resumes too: run the same command into the same output folder and it keeps
 the finished stages, removes what the interrupted stage left in the store, and goes on.

@@ -42,6 +42,9 @@ pub struct Stats {
     pub scatter: Vec<f32>,
     /// Whether the sky moves enough here for transits to be confirmed.
     pub resolvable: Vec<bool>,
+    /// Shares of red and blue in the light summed over frames (camera RGB).
+    pub red: Vec<f32>,
+    pub blue: Vec<f32>,
 }
 
 /// Statistics over the store's `frames` (a window around a hero frame, or all of them).
@@ -113,6 +116,8 @@ pub fn temporal_stats(
         resolvable: (0..w * h)
             .map(|p| steps[(p / w / CELL) * w.div_ceil(CELL) + (p % w) / CELL] > 0)
             .collect(),
+        red: Vec::with_capacity(w * h),
+        blue: Vec::with_capacity(w * h),
     };
     for s in strips {
         out.median.extend(s.median);
@@ -121,6 +126,11 @@ pub fn temporal_stats(
         out.excess.extend(s.excess);
         out.transit.extend(s.transit);
         out.scatter.extend(s.scatter);
+        for c in s.colour {
+            let total = (c[0] + c[1] + c[2]).max(f32::MIN_POSITIVE);
+            out.red.push(c[0] / total);
+            out.blue.push(c[2] / total);
+        }
     }
     Ok(out)
 }
@@ -132,6 +142,7 @@ struct Strip {
     excess: Vec<f32>,
     transit: Vec<f32>,
     scatter: Vec<f32>,
+    colour: Vec<[f32; 3]>,
 }
 
 /// What every strip shares: the store, the first frame used and that range's angles, frame
@@ -157,12 +168,17 @@ fn strip(c: &Context, y0: usize, y1: usize) -> Result<Strip> {
     let (w, h, n) = (store.manifest.width, store.manifest.height, trends.len());
     let (ya, yb) = (y0.saturating_sub(HALO), (y1 + HALO).min(h));
     let plane = (yb - ya) * w;
+    let core = (y0 - ya) * w..(y1 - ya) * w;
     let mut v = Vec::with_capacity(n * plane);
+    let mut colour = vec![[0f32; 3]; core.len()];
     for i in first..first + n {
         let rgb = store.rgb_rows(i, ya, yb)?;
-        v.extend(rgb.as_chunks::<3>().0.iter().map(|p| p[0] + p[1] + p[2]));
+        let pixels = rgb.as_chunks::<3>().0;
+        for (sum, p) in colour.iter_mut().zip(&pixels[core.clone()]) {
+            *sum = std::array::from_fn(|k| sum[k] + p[k].max(0.0));
+        }
+        v.extend(pixels.iter().map(|p| p[0] + p[1] + p[2]));
     }
-    let core = (y0 - ya) * w..(y1 - ya) * w;
     let mut buf = vec![0f32; n];
     let gather = |v: &[f32], p: usize, buf: &mut [f32]| {
         for (f, b) in buf.iter_mut().enumerate() {
@@ -277,5 +293,6 @@ fn strip(c: &Context, y0: usize, y1: usize) -> Result<Strip> {
         excess,
         transit,
         scatter,
+        colour,
     })
 }

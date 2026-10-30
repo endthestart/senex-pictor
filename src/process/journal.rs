@@ -96,6 +96,36 @@ pub fn continue_in(out: &Path, fresh: Report) -> Result<Report> {
     }
 }
 
+fn write(out: &Path, report: &Report) -> Result<()> {
+    let tmp = out.join(format!("{FILE}.tmp"));
+    std::fs::write(&tmp, serde_json::to_vec_pretty(report)?)?;
+    Ok(std::fs::rename(tmp, out.join(FILE))?)
+}
+
+/// Reopens the finished run in `out` at stage `from`: that stage, those after it and the
+/// result leave its report, so processing the same frames there runs them again.
+pub fn reopen(out: &Path, from: &str) -> Result<Report> {
+    let mut r =
+        Report::load(out)?.ok_or_else(|| error(format!("{} holds no run", out.display())))?;
+    if !r.complete {
+        return Err(error(format!(
+            "{}: the run is unfinished; resume it first",
+            out.display()
+        )));
+    }
+    let at = r
+        .stages
+        .iter()
+        .position(|s| s.name == from)
+        .ok_or_else(|| error(format!("the run in {} has no {from} stage", out.display())))?;
+    r.stages.truncate(at);
+    r.complete = false;
+    r.result = None;
+    r.image.clear();
+    write(out, &r)?;
+    Ok(r)
+}
+
 pub struct Journal<'a> {
     out: &'a Path,
     progress: Progress,
@@ -161,9 +191,7 @@ impl<'a> Journal<'a> {
     }
 
     pub fn save(&self) -> Result<()> {
-        let tmp = self.out.join(format!("{FILE}.tmp"));
-        std::fs::write(&tmp, serde_json::to_vec_pretty(&self.report)?)?;
-        Ok(std::fs::rename(tmp, self.out.join(FILE))?)
+        write(self.out, &self.report)
     }
 
     /// A stage done before the journal (the sequence check), unless already recorded.
