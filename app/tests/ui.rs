@@ -27,7 +27,7 @@ fn harness(open: Option<PathBuf>, demo: Option<[u32; 2]>) -> Harness<'static, Pi
                         .unwrap_or_else(|| pollster::block_on(async { test_device().await })),
                     bench_seconds: None,
                     screenshot: None,
-                    menu: false,
+                    desktop: false,
                 },
             )
         })

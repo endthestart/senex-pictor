@@ -29,7 +29,16 @@ pub struct Settings {
     pub memory_gb: Option<f64>,
     /// Where a RAW folder's run goes unless another is chosen; `~/Pictures/Pictor` when absent.
     pub output: Option<PathBuf>,
+    /// Folders opened lately, newest first.
+    #[serde(default)]
+    pub recent: Vec<PathBuf>,
+    /// The file they are kept in; none keeps them in memory only (headless tests).
+    #[serde(skip)]
+    file: Option<PathBuf>,
 }
+
+/// Folders kept in the recent list.
+const RECENT: usize = 6;
 
 impl Default for Settings {
     fn default() -> Settings {
@@ -37,6 +46,8 @@ impl Default for Settings {
             gpu: GpuChoice::Automatic,
             memory_gb: None,
             output: None,
+            recent: Vec::new(),
+            file: None,
         }
     }
 }
@@ -63,18 +74,24 @@ fn file() -> Result<PathBuf> {
 const KEY: &str = "pictor.settings";
 
 impl Settings {
-    /// The saved settings; the defaults when none were saved.
+    /// The saved settings, kept in the platform's settings file; the defaults when none were
+    /// saved.
     pub fn load() -> Result<Settings> {
         let path = file()?;
-        if !path.exists() {
-            return Ok(Settings::default());
-        }
-        serde_json::from_slice(&std::fs::read(&path)?)
-            .map_err(|e| error(format!("{}: {e}", path.display())))
+        let mut s: Settings = if path.exists() {
+            serde_json::from_slice(&std::fs::read(&path)?)
+                .map_err(|e| error(format!("{}: {e}", path.display())))?
+        } else {
+            Settings::default()
+        };
+        s.file = Some(path);
+        Ok(s)
     }
 
     pub fn save(&self) -> Result<()> {
-        let path = file()?;
+        let Some(path) = self.file.clone() else {
+            return Ok(());
+        };
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir)?;
         }
@@ -92,6 +109,14 @@ impl Settings {
 
     pub fn put(self, ctx: &egui::Context) {
         ctx.data_mut(|d| d.insert_temp(egui::Id::new(KEY), self));
+    }
+
+    /// `path` first in the recent list, saved.
+    pub fn opened(&mut self, path: &std::path::Path) -> Result<()> {
+        self.recent.retain(|p| p != path);
+        self.recent.insert(0, path.to_path_buf());
+        self.recent.truncate(RECENT);
+        self.save()
     }
 
     /// A run's memory budget, carrying `progress`.

@@ -33,8 +33,9 @@ pub struct Start {
     pub device: wgpu::Device,
     pub bench_seconds: Option<f64>,
     pub screenshot: Option<PathBuf>,
-    /// Installs the macOS menu bar (not in headless tests, which have no application).
-    pub menu: bool,
+    /// Installs the macOS menu bar and keeps the owner's settings (not in headless tests,
+    /// which have no application and must not change them).
+    pub desktop: bool,
 }
 
 pub struct Pictor {
@@ -53,6 +54,8 @@ pub struct Pictor {
     shot: Option<crate::shot::Shot>,
     pub(crate) settings: Settings,
     pub(crate) settings_window: crate::settings::Window,
+    /// The window's context, where screens read the settings.
+    pub(crate) ctx: egui::Context,
     #[cfg(target_os = "macos")]
     pub(crate) menu: Option<crate::menu::NativeMenu>,
 }
@@ -82,7 +85,12 @@ impl Pictor {
                 lines: vec!["the window did not start with wgpu".into()],
             },
         };
-        let (settings, settings_error) = match Settings::load() {
+        let loaded = if s.desktop {
+            Settings::load()
+        } else {
+            Ok(Settings::default())
+        };
+        let (settings, settings_error) = match loaded {
             Ok(s) => (s, None),
             Err(e) => (
                 Settings::default(),
@@ -112,11 +120,12 @@ impl Pictor {
             bench: s.bench_seconds.map(crate::bench::Window::new),
             settings,
             settings_window: Default::default(),
+            ctx: cc.egui_ctx.clone(),
             #[cfg(target_os = "macos")]
             menu: None,
         };
         #[cfg(target_os = "macos")]
-        if s.menu {
+        if s.desktop {
             match crate::menu::NativeMenu::install(&cc.egui_ctx) {
                 Ok(m) => app.menu = Some(m),
                 Err(e) => eprintln!("pictor: no menu bar ({e})"),
@@ -182,7 +191,7 @@ impl Pictor {
         match (&mut self.workspace, self.step) {
             (Workspace::Empty, _) => {
                 egui::CentralPanel::default().show(ui, |ui| {
-                    action = welcome::show(ui, self.error.as_deref());
+                    action = welcome::show(ui, self.error.as_deref(), &self.settings.recent);
                 });
             }
             (Workspace::Loading(job), _) => {

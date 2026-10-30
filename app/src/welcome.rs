@@ -12,7 +12,7 @@ pub enum Action {
     Demo,
 }
 
-pub fn show(ui: &mut Ui, error: Option<&str>) -> Option<Action> {
+pub fn show(ui: &mut Ui, error: Option<&str>, recent: &[PathBuf]) -> Option<Action> {
     let mut action = None;
     let dropping = ui.ctx().input(|i| !i.raw.hovered_files.is_empty());
     ui.vertical_centered(|ui| {
@@ -77,6 +77,22 @@ pub fn show(ui: &mut Ui, error: Option<&str>) -> Option<Action> {
                 action = Some(Action::Demo);
             }
         });
+        if !recent.is_empty() {
+            ui.add_space(20.0);
+            ui.vertical(|ui| {
+                ui.set_max_width(width);
+                widgets::section(ui, "Recent");
+                for path in recent {
+                    let there = path.exists();
+                    let name = crate::project::name(path);
+                    let row = ui.add_enabled(there, egui::Button::new(name).frame(false));
+                    let row = row.on_hover_text(path.display().to_string());
+                    if row.clicked() {
+                        action = Some(Action::Open(path.clone()));
+                    }
+                }
+            });
+        }
         if let Some(e) = error {
             ui.add_space(16.0);
             ui.horizontal(|ui| {

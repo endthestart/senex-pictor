@@ -18,6 +18,10 @@ impl Pictor {
     /// Opens what `path` holds.
     pub fn open(&mut self, path: PathBuf) {
         self.error = None;
+        if let Err(e) = self.settings.opened(&path) {
+            eprintln!("pictor: the recent folders were not saved ({e})");
+        }
+        self.settings.clone().put(&self.ctx);
         match project::classify(&path) {
             Ok(Kind::Raw(raw)) => {
                 self.workspace =
