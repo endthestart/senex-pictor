@@ -2,10 +2,10 @@
 //!
 //! Confirmed star transits mark sky; brightness against a sky background fitted to transit
 //! pixels (then refitted with featureless near-clear pixels) gives fractional coverage;
-//! values within 3σ of 0 or 1 snap, as do near-clear pixels in clear neighbourhoods. With
-//! segments, dark segments are ground where no transit lies within the local transit gap
-//! (motion outranks brightness: pale trunks, lit bark). Ground islands up to
-//! MAX_GROUND_ISLAND pixels (demosaic artefacts of hot pixels) become sky.
+//! values within 3σ of 0 or 1 snap, as do near-clear pixels in clear neighbourhoods. Motion
+//! outranks brightness: a part-sky pixel with no transit within the local transit gap is
+//! ground (lit foliage, pale bark), as are dark segments there when segments are given.
+//! Ground islands up to MAX_GROUND_ISLAND pixels (demosaic artefacts of hot pixels) become sky.
 
 use super::filters::{components, dilate, distance_squared, erode, median, open, uniform};
 use super::grid::{fill_nearest, gaussian, resize};
@@ -97,8 +97,9 @@ fn brightness(
 }
 
 /// Per pixel the 99th-percentile distance to the nearest transit over the brightness-clear
-/// pixels of its GAP_BLOCK block (sparse blocks take the nearest block's), log-smoothed.
-fn transit_gaps(gap: &[f64], clear: &[bool], w: usize, h: usize) -> Result<Vec<f32>> {
+/// pixels of its GAP_BLOCK block (sparse blocks take the nearest block's), log-smoothed; none
+/// without brightness-clear sky.
+fn transit_gaps(gap: &[f64], clear: &[bool], w: usize, h: usize) -> Option<Vec<f32>> {
     let b = GAP_BLOCK;
     let (gw, gh) = (w.div_ceil(b), h.div_ceil(b));
     let mut cells = Vec::with_capacity(gw * gh);
@@ -115,13 +116,30 @@ fn transit_gaps(gap: &[f64], clear: &[bool], w: usize, h: usize) -> Result<Vec<f
             );
         }
     }
-    let filled = fill_nearest(&cells, gw, gh)
-        .ok_or_else(|| error("matte: no brightness-clear sky to measure transit density"))?;
+    let filled = fill_nearest(&cells, gw, gh)?;
     let logs: Vec<f64> = filled.iter().map(|v| v.max(NEAR_RADIUS_PX).ln()).collect();
     let up = resize(&gaussian(&logs, gw, gh, 1.0, true), gw, gh, gw * b, gh * b);
-    Ok((0..w * h)
-        .map(|p| up[(p / w) * gw * b + p % w].exp())
-        .collect())
+    Some(
+        (0..w * h)
+            .map(|p| up[(p / w) * gw * b + p % w].exp())
+            .collect(),
+    )
+}
+
+/// Whether each pixel lies within the local transit gap of a transit (everywhere where gaps
+/// exceed MAX_GAP_PX or no transit was seen: sparse skies keep their brightness matte).
+fn near_transits(seen: &[bool], alpha: &[f32], w: usize, h: usize) -> Vec<bool> {
+    let Some((gap2, _)) = distance_squared(seen, w, h) else {
+        return vec![true; w * h];
+    };
+    let gap: Vec<f64> = gap2.iter().map(|d| d.sqrt()).collect();
+    let clear: Vec<bool> = alpha.iter().map(|&a| a >= 0.98).collect();
+    let Some(radius) = transit_gaps(&gap, &clear, w, h) else {
+        return vec![true; w * h];
+    };
+    (0..w * h)
+        .map(|p| gap[p] <= f64::from(radius[p]) || f64::from(radius[p]) > MAX_GAP_PX)
+        .collect()
 }
 
 /// The matte from temporal statistics; `labels` (one segment id per pixel, 0 = none) are
@@ -155,6 +173,10 @@ pub fn matte(stats: &Stats, frames: usize, labels: Option<&[u32]>) -> Result<Mat
         })
         .collect();
     let mut ground: Vec<bool> = (0..w * h).map(|p| alpha[p] <= 3.0 * noise[p]).collect();
+    let near = near_transits(&seen, &alpha, w, h);
+    for p in 0..w * h {
+        ground[p] |= !near[p] && !clear[p] && stats.resolvable[p];
+    }
     let mut segments = 0;
     if let Some(labels) = labels {
         let count = labels.iter().copied().max().unwrap_or(0) as usize + 1;
@@ -175,18 +197,8 @@ pub fn matte(stats: &Stats, frames: usize, labels: Option<&[u32]>) -> Result<Mat
             })
             .collect();
         segments = pixels.iter().skip(1).filter(|&&n| n > 0).count();
-        let (gap2, _) =
-            distance_squared(&seen, w, h).ok_or_else(|| error("matte: no star transits seen"))?;
-        let gap: Vec<f64> = gap2.iter().map(|d| d.sqrt()).collect();
-        let radius = transit_gaps(
-            &gap,
-            &alpha.iter().map(|&a| a >= 0.98).collect::<Vec<_>>(),
-            w,
-            h,
-        )?;
         for p in 0..w * h {
-            let near = gap[p] <= f64::from(radius[p]) || f64::from(radius[p]) > MAX_GAP_PX;
-            ground[p] |= dark[labels[p] as usize] && !near;
+            ground[p] |= dark[labels[p] as usize] && !near[p];
         }
     }
     let mut snapped: Vec<f32> = (0..w * h)

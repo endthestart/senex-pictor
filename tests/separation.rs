@@ -50,7 +50,8 @@ fn clipping_drops_a_satellite_trail_and_keeps_the_noise() {
 }
 
 /// Sky in the upper half with star transits everywhere and one dead pixel, a dark tree trunk
-/// through it, dark ground in the lower half and a bright patch there without transits (lit bark).
+/// through it, a half-covered row along its lower edge, dark ground in the lower half and a
+/// bright patch there without transits (lit bark).
 fn scene() -> Stats {
     let (w, h) = (96, 64);
     let p = |f: &dyn Fn(usize, usize) -> f32| -> Vec<f32> {
@@ -61,6 +62,8 @@ fn scene() -> Stats {
     let level = |x: usize, y: usize| {
         if sky(x, y) {
             1000.0
+        } else if y == 32 && x < 40 {
+            550.0
         } else if (60..70).contains(&x) && (44..54).contains(&y) {
             900.0
         } else {
@@ -95,8 +98,13 @@ fn the_matte_is_sky_where_stars_cross_and_ground_where_dark() -> Result<()> {
         "a one-pixel ground island in the sky counts as sky"
     );
     assert!(
-        at(65, 49) > 0.5,
-        "without segments a bright patch reads as sky by brightness"
+        (0.3..0.7).contains(&at(5, 32)),
+        "a half-covered edge beside the transits keeps its share of sky"
+    );
+    assert_eq!(
+        at(65, 49),
+        0.0,
+        "motion outranks brightness: a lit patch far from any transit is ground"
     );
     let mut labels = vec![0u32; s.width * s.height];
     for (i, l) in labels.iter_mut().enumerate() {
