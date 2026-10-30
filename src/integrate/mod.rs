@@ -43,6 +43,30 @@ pub fn recorded_flat(store: &Store) -> Result<Vec<f32>> {
     Ok(lens::field(store.manifest.width, store.manifest.height, k))
 }
 
+/// Sets every colour of the stack's clipped cores to the sensor white (the lowest white above
+/// black of any frame and site, flat-fielded like the samples), so they render white whatever
+/// the colour of the samples that escaped saturation; returns how many.
+pub(crate) fn saturate(sky: &mut cfa::SkyStack, store: &Store, flat: &[f32]) -> usize {
+    let white = store
+        .manifest
+        .frames
+        .iter()
+        .flat_map(|f| f.black.iter().map(move |b| f.white - b))
+        .fold(f32::INFINITY, f32::min);
+    let mut n = 0;
+    for ((rgb, _), f) in sky
+        .rgb
+        .iter_mut()
+        .zip(&sky.clipped)
+        .zip(flat)
+        .filter(|((_, c), _)| **c)
+    {
+        *rgb = [white / f; 3];
+        n += 1;
+    }
+    n
+}
+
 fn percentile(values: &mut [f64], q: f64) -> f64 {
     values.sort_by(f64::total_cmp);
     crate::sky::report::percentile(values, q).unwrap_or(f64::NAN)
@@ -89,21 +113,7 @@ pub fn stack(store: &Store, o: &Options, budget: &Budget) -> Result<Report> {
         None => cfa::stack(&inputs, budget)?,
     };
     let t_sky = clock.elapsed().as_secs_f64();
-    let white = store
-        .manifest
-        .frames
-        .iter()
-        .flat_map(|f| f.black.iter().map(move |b| f.white - b))
-        .fold(f32::INFINITY, f32::min);
-    let mut filled = 0;
-    for (rgb, clipped) in sky.rgb.iter_mut().zip(&sky.clipped) {
-        if *clipped && rgb.iter().any(|v| !v.is_finite()) {
-            filled += 1;
-            for v in rgb.iter_mut().filter(|v| !v.is_finite()) {
-                *v = white;
-            }
-        }
-    }
+    let filled = saturate(&mut sky, store, &flat);
     let mask: Vec<bool> = alpha.iter().map(|&a| a <= 0.5).collect();
     let fg = foreground::foreground(
         store,

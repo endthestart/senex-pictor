@@ -122,10 +122,11 @@ pub fn hero(store: &Store, o: &Options, budget: &Budget) -> Result<Report> {
         occlusion: "hero-occ",
         frames: &frames,
     };
-    let sky = match gpu {
+    let mut sky = match gpu {
         Some(gpu) => crate::gpu::stack::stack(gpu, &inputs, budget)?,
         None => cfa::stack(&inputs, budget)?,
     };
+    super::saturate(&mut sky, store, &flat);
     let divide = |rgb: Vec<f32>| -> Vec<[f32; 3]> {
         rgb.as_chunks::<3>()
             .0

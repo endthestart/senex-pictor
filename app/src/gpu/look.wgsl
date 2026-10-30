@@ -45,7 +45,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let l = dot(d, WEIGHTS);
     var shown: vec3<f32>;
     for (var k = 0; k < 3; k++) {
-        let sv = l + look.saturation * (d[k] - l);
+        let sv = max(l + look.saturation * (d[k] - l), d[k] / look.saturation);  // render::saturate
         let y = asinh(look.stretch * max(sv / look.scale, 0.0)) / look.norm;
         let sky = encode(pow(y, look.shadows));
         let ground = encode(c[k] / look.white);

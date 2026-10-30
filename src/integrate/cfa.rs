@@ -34,6 +34,9 @@ const PROBE_STEP: usize = 32;
 /// Per output pixel and worker: the samples gathered for one pixel are small; the band's
 /// frame rows dominate and are counted per band.
 const PIXEL_WORKER_BYTES: u64 = 1 << 20;
+/// A pixel is a clipped core where at least this share of one colour's samples was saturated;
+/// fewer (a hot pixel, an aircraft light) are left out like any other outlier.
+pub const CLIPPED_SHARE: f32 = 0.1;
 
 pub struct SkyStack {
     /// Camera RGB in ADU (glow-corrected to the reference), NaN where no sample survived.
@@ -41,7 +44,7 @@ pub struct SkyStack {
     pub kept: Vec<[u32; 3]>,
     /// Means of the even- and odd-numbered frames' kept samples (half their difference is noise).
     pub halves: [Vec<[f32; 3]>; 2],
-    /// Pixels where some frame's sample was saturated.
+    /// Clipped cores: at least CLIPPED_SHARE of one colour's samples were saturated.
     pub clipped: Vec<bool>,
 }
 
@@ -231,7 +234,7 @@ fn pixel(inputs: &Inputs, rotations: &[Matrix], rows: &[Option<Rows>], q: usize)
     let reference = inputs.glow[inputs.model.reference].sample(point);
     let (sigma, radius) = (inputs.kernel.sigma, inputs.kernel.radius);
     let mut samples: [Vec<Sample>; 3] = Default::default();
-    let mut clipped = false;
+    let mut saturated = [0u32; 3];
     for (i, band) in rows.iter().enumerate() {
         let Some(band) = band else { continue };
         let Some(p) = camera.pixel(apply(&rotations[i], ray)) else {
@@ -262,11 +265,11 @@ fn pixel(inputs: &Inputs, rotations: &[Matrix], rows: &[Option<Rows>], q: usize)
                 continue;
             }
             let raw = f32::from(band.cfa[local]);
+            let c = usize::from(m.cfa[site]);
             if raw >= white {
-                clipped = true;
+                saturated[c] += 1;
                 continue;
             }
-            let c = usize::from(m.cfa[site]);
             let value = (raw - m.frames[i].black[site]) / inputs.flat[s] - (glow[c] - reference[c]);
             if value.is_finite() {
                 let weight = (-d2 / (2.0 * sigma * sigma)).exp() as f32;
@@ -278,6 +281,10 @@ fn pixel(inputs: &Inputs, rotations: &[Matrix], rows: &[Option<Rows>], q: usize)
             }
         }
     }
+    let clipped = (0..3).any(|c| {
+        let n = saturated[c] as f32;
+        n > 0.0 && n >= CLIPPED_SHARE * (n + samples[c].len() as f32)
+    });
     let mut out = Pixel { clipped, ..none };
     for (c, s) in samples.iter_mut().enumerate() {
         let (mean, kept, halves) = weighted(s);

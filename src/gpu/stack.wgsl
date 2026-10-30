@@ -1,13 +1,14 @@
 // CFA (Bayer-drizzle) sky stack on the GPU: the twin of `integrate::cfa` for one band of
 // output rows. One invocation per output pixel and colour gathers that colour's nearest CFA
 // samples from every frame, clips them about the median of the near samples and writes the
-// weighted mean, the even- and odd-frame means and the kept count (+0.5 if a sample of
-// this colour was saturated).
+// weighted mean, the even- and odd-frame means and the kept count (+0.5 where at least
+// CLIPPED_SHARE of this colour's samples were saturated: a clipped core).
 
 const MAX_SAMPLES: u32 = 640u;
 const CENTRE_WEIGHT: f32 = 0.3;
 const CLIP_K: f32 = 4.0;
 const CLIP_ROUNDS: u32 = 2u;
+const CLIPPED_SHARE: f32 = 0.1;  // integrate::cfa::CLIPPED_SHARE
 const UNDISTORT_ROUNDS: u32 = 30u;
 // Written where a mean has no weight (WGSL gives no portable NaN).
 const NONE: f32 = -1e30;
@@ -170,7 +171,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let v = ray(point);
     let reference = glow_at(params.reference, point);
     var count = 0u;
-    var clipped = 0.0;
+    var saturated = 0u;
     var overflow = false;
     for (var i = 0u; i < params.frames; i++) {
         let fr = frames[i];
@@ -209,7 +210,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             }
             let raw = f32(cfa_value(fr.cfa_offset + local * w + ix));
             if (raw >= fr.white) {
-                clipped = 1.0;
+                saturated++;
                 continue;
             }
             if (g.w < 0.5 || reference.w < 0.5) {
@@ -274,5 +275,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             out[slot + k] = sums[2u * k] / sums[2u * k + 1u];
         }
     }
-    out[slot + 3u] = f32(kept) + 0.5 * clipped;
+    let clipped = saturated > 0u && f32(saturated) >= CLIPPED_SHARE * f32(saturated + count);
+    out[slot + 3u] = f32(kept) + select(0.0, 0.5, clipped);
 }

@@ -103,12 +103,16 @@ pub struct Scene<'a> {
 /// Linear sRGB of a flat-fielded camera-RGB image under `look`.
 pub fn linear(image: &[[f32; 3]], scene: &Scene, look: &Look) -> Vec<[f32; 3]> {
     let m = scene.matrix.map(|r| r.map(|v| v as f32));
+    let lowest = scene.wb.iter().copied().fold(f32::INFINITY, f32::min);
     image
         .iter()
         .enumerate()
         .map(|(p, c)| {
             let a = scene.alpha[p];
             let keep = scene.flat[p].powf(VIGNETTE_KEPT);
+            // Every colour clips at the sensor white; after white balance the lowest of those
+            // levels is as far as all three are known, so clipped light stays neutral.
+            let clip = scene.white / scene.flat[p] * lowest;
             let v: [f32; 3] = std::array::from_fn(|k| {
                 let x = if c[k].is_finite() { c[k] } else { 0.0 };
                 let g = if look.remove_glow && scene.glow[p][k].is_finite() {
@@ -116,7 +120,7 @@ pub fn linear(image: &[[f32; 3]], scene: &Scene, look: &Look) -> Vec<[f32; 3]> {
                 } else {
                     0.0
                 };
-                (x - g) * keep * scene.wb[k]
+                ((x * scene.wb[k]).min(clip) - g * scene.wb[k]) * keep
             });
             std::array::from_fn(|i| m[i][0] * v[0] + m[i][1] * v[1] + m[i][2] * v[2])
         })
@@ -153,6 +157,13 @@ pub fn levels(rgb: &[[f32; 3]], clear: &[bool], look: &Look) -> Result<([f32; 3]
     Ok((black, scale))
 }
 
+/// A colour `d` of luminance `l` with its saturation raised by `saturation`, never below
+/// `d / saturation`: extrapolating from luminance would take the weak colour of a bright,
+/// strongly coloured star below zero and leave a cyan or magenta core after the stretch.
+pub fn saturate(d: f32, l: f32, saturation: f32) -> f32 {
+    (l + saturation * (d - l)).max(d / saturation)
+}
+
 /// Display values in 0..=1 (sRGB-encoded): black removed, saturation, asinh stretch, shadow curve.
 pub fn finish(rgb: &[[f32; 3]], black: [f32; 3], scale: f32, look: &Look) -> Vec<[f32; 3]> {
     let norm = look.stretch.asinh();
@@ -161,7 +172,7 @@ pub fn finish(rgb: &[[f32; 3]], black: [f32; 3], scale: f32, look: &Look) -> Vec
             let d: [f32; 3] = std::array::from_fn(|k| c[k] - black[k]);
             let l = d[0] * WEIGHTS[0] + d[1] * WEIGHTS[1] + d[2] * WEIGHTS[2];
             std::array::from_fn(|k| {
-                let s = l + look.saturation * (d[k] - l);
+                let s = saturate(d[k], l, look.saturation);
                 let y = (look.stretch * (s / scale).max(0.0)).asinh() / norm;
                 encode(y.powf(look.shadows))
             })
@@ -201,4 +212,35 @@ pub fn compare(images: &[&[[f32; 3]]], scene: &Scene, look: &Look) -> Result<Vec
         .iter()
         .map(|r| display(r, scene, black, scale, look))
         .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bright_star_cores_keep_every_colour() -> Result<()> {
+        let xyz_to_camera = crate::review::built_in_matrix("NIKON CORPORATION", "NIKON D700")?
+            .ok_or_else(|| error("no D700 matrix"))?;
+        let (white, flat) = (16383.0, 0.8);
+        let scene = Scene {
+            alpha: &[1.0],
+            clear: &[true],
+            glow: &[[0.0; 3]],
+            flat: &[flat],
+            wb: [1.890_625, 1.0, 2.148_437_5],
+            matrix: camera_to_srgb(&xyz_to_camera)?,
+            white,
+        };
+        // A clipped star core as the stack fills it: sensor white in every colour.
+        let rgb = linear(&[[white / flat; 3]], &scene, &NATURAL)[0];
+        let (lo, hi) = rgb
+            .iter()
+            .fold((f32::MAX, 0f32), |(l, h), &v| (l.min(v), h.max(v)));
+        assert!(hi - lo < 1e-3 * hi, "{rgb:?}");
+        // A bright, strongly coloured star: its weak colour stays visible after the boost.
+        let shown = finish(&[[500.0, 6000.0, 9000.0]], [0.0; 3], 812.0, &NATURAL)[0];
+        assert!(shown[0] > 0.5, "{shown:?}");
+        Ok(())
+    }
 }
