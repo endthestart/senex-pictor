@@ -14,7 +14,7 @@ use crate::render::Look;
 use crate::sequence::Survey;
 use crate::store::planes;
 use crate::{Result, error, gpu::Gpu, register, review, separate, store};
-pub use correct::correct;
+pub use correct::{Redo, redo};
 use journal::Journal;
 pub use journal::{Report, Stage};
 use serde::Serialize;
@@ -38,6 +38,8 @@ pub struct Options<'a> {
     pub look: Look,
     /// Separation draws the matte onward again from its saved statistics (after corrections).
     pub rematte: bool,
+    /// Moving foreground from the reference minutes instead of the long exposure's blur.
+    pub sharp_moving: bool,
 }
 
 /// Foreground moving more than this (px) over the sequence puts trees in different places in
@@ -188,6 +190,7 @@ pub fn process(o: &Options, survey: &Survey, budget: &Budget) -> Result<Report> 
         last: last.to_string(),
         hero: o.hero.map(str::to_string),
         lens: o.lens.map(str::to_string),
+        sharp_moving: o.sharp_moving,
         frames: selected.len(),
         overexposed_left_out: left_out,
         stages: Vec::new(),
@@ -245,7 +248,10 @@ pub fn process(o: &Options, survey: &Survey, budget: &Budget) -> Result<Report> 
                 let options = around(
                     o,
                     reference,
-                    hero::Foreground::LongExposure { lit: &lit },
+                    hero::Foreground::LongExposure {
+                        lit: &lit,
+                        sharp_moving: o.sharp_moving,
+                    },
                     "hero",
                 );
                 log.record(AROUND, || hero::hero(&store, &options, budget))?;
@@ -255,6 +261,7 @@ pub fn process(o: &Options, survey: &Survey, budget: &Budget) -> Result<Report> 
                     kernel: cfa::KERNEL,
                     gpu: o.gpu,
                     lit: &lit,
+                    sharp_moving: o.sharp_moving,
                 };
                 log.record(STACK, || integrate::stack(&store, &options, budget))?;
                 "final".to_string()

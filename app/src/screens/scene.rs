@@ -54,10 +54,17 @@ fn treatments(s: &Session, run: &Run, frame: Option<&str>) -> Vec<Treatment> {
     let current = |r: &Option<String>| r.is_some() && r.as_deref() == s.result.as_deref();
     let long = Treatment {
         title: "Long exposure",
-        note: format!(
-            "Foreground averaged over the {unlit} unlit frames. Calm and clean; swaying \
-             branches go soft."
-        ),
+        note: if run.report.sharp_moving {
+            format!(
+                "Foreground averaged over the {unlit} unlit frames; swaying branches and water \
+                 come sharp from the reference minutes, a little noisier."
+            )
+        } else {
+            format!(
+                "Foreground averaged over the {unlit} unlit frames. Calm and clean; swaying \
+                 branches go soft."
+            )
+        },
         result: own.clone(),
         tag: Some(("Recommended", Badge::Strong)),
     };
@@ -208,6 +215,19 @@ pub fn show(ui: &mut Ui, s: &mut Session) {
                             }
                         });
                         ui.label(RichText::new(&t.note).size(12.5).color(MUTED));
+                        if t.title == "Long exposure" && s.scene.making.is_none() {
+                            ui.horizontal(|ui| {
+                                ui.label(RichText::new("Moving branches").size(12.5));
+                                let now = usize::from(run.report.sharp_moving);
+                                if let Some(k) =
+                                    widgets::segmented(ui, &["Blurred", "Sharp"], Some(now))
+                                    && k != now
+                                {
+                                    s.scene.making =
+                                        Some(Making::recompose(run, k == 1, settings.clone()));
+                                }
+                            });
+                        }
                         let Some(result) = &t.result else {
                             return;
                         };

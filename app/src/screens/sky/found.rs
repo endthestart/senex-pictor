@@ -3,7 +3,7 @@
 //! camera drifted, where the mask came from.
 
 use crate::project::Run;
-use crate::theme::WARN;
+use crate::theme::MUTED;
 use crate::widgets::{self, card, section, strong};
 use egui::{RichText, Ui};
 
@@ -42,11 +42,15 @@ pub fn cards(ui: &mut Ui, run: &Run) {
         {
             ui.label(
                 RichText::new(format!(
-                    "{:.1}% of the picture changed between sky and ground during the night \
-                 (swaying branches, water); it takes the reference frame's ground.",
-                    unstable as f64 / pixels * 100.0
+                    "{:.1}% of the picture moved during the night (swaying branches, water); {}",
+                    unstable as f64 / pixels * 100.0,
+                    if run.report.sharp_moving {
+                        "it comes sharp from the reference minutes (Scene)."
+                    } else {
+                        "the long exposure blurs it; Scene can take it sharp instead."
+                    }
                 ))
-                .color(WARN),
+                .color(MUTED),
             );
         }
         if let Some(painted) = sep["corrected_pixels"].as_u64()

@@ -407,3 +407,33 @@ fn show_zooms_to_a_region_the_colour_check_made_ground() -> Result<()> {
     save(&h.render().map_err(error)?, "sky-region.jpg")?;
     Ok(())
 }
+
+/// Scene's long exposure switches moving branches between sharp and blurred by redoing the
+/// composite (`PICTOR_UI_CORRECT`, a run the test changes; skipped without it).
+#[test]
+fn moving_branches_switch_redoes_the_composite() -> Result<()> {
+    let Ok(folder) = std::env::var("PICTOR_UI_CORRECT") else {
+        eprintln!("PICTOR_UI_CORRECT is not set; skipped");
+        return Ok(());
+    };
+    let mut h = harness(Some(PathBuf::from(folder)), None);
+    wait(&mut h, 300, Pictor::opened)?;
+    let sharp = |p: &Pictor| {
+        p.session()
+            .and_then(|s| s.run.as_ref())
+            .map(|r| r.report.sharp_moving)
+    };
+    let before = sharp(h.state()).ok_or("the run should open")?;
+    h.state_mut().show_step(Step::Scene);
+    wait(&mut h, 60, Pictor::idle)?;
+    h.get_by_label(if before { "Blurred" } else { "Sharp" })
+        .click();
+    h.step();
+    assert!(
+        !h.state().idle(),
+        "the composite is redone in the background"
+    );
+    wait(&mut h, 1800, |p| p.idle() && sharp(p) == Some(!before))?;
+    save(&h.render().map_err(error)?, "scene-moving.jpg")?;
+    Ok(())
+}

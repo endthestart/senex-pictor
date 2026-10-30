@@ -16,7 +16,10 @@ use std::path::Path;
 
 pub struct Making {
     pub label: String,
+    /// Makes the result; its name.
     pub job: Job<String>,
+    /// The preview file the result renders to, read again once made.
+    preview: Option<String>,
 }
 
 /// Renders result `name` of the store in `out` to `out/name.jpg` for its preview.
@@ -48,6 +51,7 @@ impl Making {
             run.report.lens.clone(),
         );
         Making {
+            preview: None,
             label: format!("Making the hero composite around {name}"),
             job: Job::start("Making a hero composite", move |progress| {
                 let store = Store::open(&dir)?;
@@ -75,6 +79,7 @@ impl Making {
         let name = run.store.manifest.frames[frame].name.clone();
         let (dir, out) = (run.store.dir.clone(), run.out.clone());
         Making {
+            preview: None,
             label: format!("Making the moment at {name}"),
             job: Job::start("Making a moment", move |progress| {
                 let store = Store::open(&dir)?;
@@ -82,6 +87,31 @@ impl Making {
                 let result = format!("moment-{}", name.split('.').next().unwrap_or(&name));
                 preview(&store, &out, &result)?;
                 Ok(result)
+            }),
+        }
+    }
+
+    /// The run's own composite again, with moving foreground sharp or blurred.
+    pub fn recompose(run: &Run, sharp_moving: bool, settings: Settings) -> Making {
+        let out = run.out.clone();
+        Making {
+            preview: Some("final".into()),
+            label: if sharp_moving {
+                "Taking moving branches sharp from the reference minutes".into()
+            } else {
+                "Blurring moving branches in the long exposure".into()
+            },
+            job: Job::start("Redoing the composite", move |progress| {
+                let gpu = settings.gpu()?;
+                let report = process::redo(
+                    &out,
+                    process::Redo::Composite { sharp_moving },
+                    gpu.as_ref(),
+                    &settings.budget(progress)?,
+                )?;
+                report
+                    .result
+                    .ok_or_else(|| pictor_engine::error("the composite was not rendered"))
             }),
         }
     }
@@ -115,11 +145,14 @@ impl Making {
 impl SceneStep {
     /// Advances the job; the result name once made.
     pub fn poll(&mut self, out: &Path) -> Option<String> {
-        let result = self.making.as_ref()?.job.poll()?;
+        let making = self.making.as_ref()?;
+        let result = making.job.poll()?;
+        let preview = making.preview.clone();
         self.making = None;
         match result {
             Ok(name) => {
-                self.refresh(&out.join(format!("{name}.jpg")));
+                let file = preview.unwrap_or_else(|| name.clone());
+                self.refresh(&out.join(format!("{file}.jpg")));
                 Some(name)
             }
             Err(e) => {

@@ -36,6 +36,8 @@ pub struct Report {
     pub last: String,
     pub hero: Option<String>,
     pub lens: Option<String>,
+    /// Moving foreground from the reference minutes instead of the long exposure's blur.
+    pub sharp_moving: bool,
     pub frames: usize,
     pub overexposed_left_out: Vec<String>,
     pub stages: Vec<Stage>,
@@ -75,13 +77,14 @@ pub fn continue_in(out: &Path, fresh: Report) -> Result<Report> {
         ))),
         Some(r) => {
             let same = r.raw == fresh.raw
-                && (r.run, &r.first, &r.last, &r.hero, &r.lens)
+                && (r.run, &r.first, &r.last, &r.hero, &r.lens, r.sharp_moving)
                     == (
                         fresh.run,
                         &fresh.first,
                         &fresh.last,
                         &fresh.hero,
                         &fresh.lens,
+                        fresh.sharp_moving,
                     );
             if !same {
                 return Err(error(format!(
@@ -103,8 +106,9 @@ fn write(out: &Path, report: &Report) -> Result<()> {
 }
 
 /// Reopens the finished run in `out` at stage `from`: that stage, those after it and the
-/// result leave its report, so processing the same frames there runs them again.
-pub fn reopen(out: &Path, from: &str) -> Result<Report> {
+/// result leave its report, so processing the same frames there runs them again; `change`
+/// updates the options recorded for it.
+pub fn reopen(out: &Path, from: &str, change: impl FnOnce(&mut Report)) -> Result<Report> {
     let mut r =
         Report::load(out)?.ok_or_else(|| error(format!("{} holds no run", out.display())))?;
     if !r.complete {
@@ -119,6 +123,7 @@ pub fn reopen(out: &Path, from: &str) -> Result<Report> {
         .position(|s| s.name == from)
         .ok_or_else(|| error(format!("the run in {} has no {from} stage", out.display())))?;
     r.stages.truncate(at);
+    change(&mut r);
     r.complete = false;
     r.result = None;
     r.image.clear();

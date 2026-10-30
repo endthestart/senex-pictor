@@ -48,8 +48,12 @@ pub struct Report {
 pub enum Foreground<'a> {
     /// The hero frame as shot, with its own transient light.
     Frame,
-    /// The long exposure of the frames not in `lit`, moved to the hero's moment.
-    LongExposure { lit: &'a [usize] },
+    /// The long exposure of the frames not in `lit`, moved to the hero's moment; with
+    /// `sharp_moving`, moving foreground from the reference minutes instead of its blur.
+    LongExposure {
+        lit: &'a [usize],
+        sharp_moving: bool,
+    },
 }
 
 pub struct Options<'a> {
@@ -151,7 +155,7 @@ pub fn hero(store: &Store, o: &Options, budget: &Budget) -> Result<Report> {
             let light = transient(&frame, &still, &alpha, noise, w, h);
             (frame, light, None)
         }
-        Foreground::LongExposure { lit } => {
+        Foreground::LongExposure { lit, sharp_moving } => {
             let Ground {
                 mut ground,
                 window,
@@ -167,7 +171,7 @@ pub fn hero(store: &Store, o: &Options, budget: &Budget) -> Result<Report> {
                 budget,
             )?;
             for (p, g) in ground.iter_mut().enumerate() {
-                if mt.unstable[p] {
+                if sharp_moving && mt.unstable[p] {
                     *g = window[p];
                 }
             }

@@ -25,6 +25,8 @@ pub struct Report {
     pub saturated_filled_pixels: usize,
     pub sky_missing_pixels: usize,
     pub ground: foreground::Report,
+    /// Moving-foreground pixels taken from the reference minutes (none unless asked for).
+    pub sharp_moving_pixels: usize,
     /// Median single-frame temporal noise and the stack's noise (half the even/odd
     /// difference, robust σ of luminance) over clear sky, in ADU.
     pub single_noise_adu: f64,
@@ -78,11 +80,19 @@ pub struct Options<'a> {
     pub gpu: Option<&'a crate::gpu::Gpu>,
     /// Frames lit by local light (headlamps, cars, light painting), left out of the ground.
     pub lit: &'a [usize],
+    /// Moving foreground (swaying branches, water) from the reference minutes, sharp but
+    /// noisier, instead of the long exposure's blur (the owner's default).
+    pub sharp_moving: bool,
 }
 
 /// Stacks the store in place: `sky.planes`, `ground.planes`, `final.planes`, `stack.json`.
 pub fn stack(store: &Store, o: &Options, budget: &Budget) -> Result<Report> {
-    let Options { kernel, gpu, lit } = *o;
+    let Options {
+        kernel,
+        gpu,
+        lit,
+        sharp_moving,
+    } = *o;
     let (w, h, n) = (
         store.manifest.width,
         store.manifest.height,
@@ -126,9 +136,11 @@ pub fn stack(store: &Store, o: &Options, budget: &Budget) -> Result<Report> {
         budget,
     )?;
     let (mut ground, window) = (fg.ground, fg.window);
+    let mut moving = 0;
     for p in 0..w * h {
-        if unstable[p] > 0.5 {
+        if sharp_moving && unstable[p] > 0.5 {
             ground[p] = window[p];
+            moving += 1;
         }
     }
     let t_ground = clock.elapsed().as_secs_f64() - t_sky;
@@ -231,6 +243,7 @@ pub fn stack(store: &Store, o: &Options, budget: &Budget) -> Result<Report> {
         samples_per_colour_median: samples_median,
         samples_per_colour_p1: samples_p1,
         saturated_filled_pixels: filled,
+        sharp_moving_pixels: moving,
         sky_missing_pixels: missing.iter().filter(|&&m| m).count(),
         ground: fg.report,
         single_noise_adu: single,

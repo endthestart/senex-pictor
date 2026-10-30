@@ -46,9 +46,22 @@ fn select(paths: Vec<PathBuf>, bounds: &[OsString]) -> Result<Vec<PathBuf>> {
 }
 
 /// The tools' command names; any other first argument is for the app.
-pub const COMMANDS: [&str; 14] = [
-    "process", "correct", "inspect", "levels", "develop", "check", "ingest", "register",
-    "separate", "stack", "hero", "moment", "render", "flat",
+pub const COMMANDS: [&str; 15] = [
+    "process",
+    "correct",
+    "recompose",
+    "inspect",
+    "levels",
+    "develop",
+    "check",
+    "ingest",
+    "register",
+    "separate",
+    "stack",
+    "hero",
+    "moment",
+    "render",
+    "flat",
 ];
 
 /// Whether `args` (without the program name) ask for a tool rather than the app.
@@ -113,6 +126,10 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             let report = stages::correct(Path::new(out), rest, &budget)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
+        [command, out, rest @ ..] if command == "recompose" => {
+            let report = stages::recompose(Path::new(out), rest, &budget)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
         [command, raw, out, rest @ ..] if command == "process" => {
             let report = stages::process(Path::new(raw), Path::new(out), rest, &budget)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
@@ -167,13 +184,13 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         _ => {
             return Err(error(
                 "usage: pictor [--memory GB] process RAW_DIR NEW_OUTPUT_DIR [--run N] [--first NAME] [--last NAME] [--hero NAME] [--lens NAME] \
-                 [--labels PLANES] [--gpu yes|NAME] [--matrix JSON] [--look natural|dark] | correct OUTPUT_DIR [--gpu yes|NAME] | inspect INPUT | levels INPUT | develop INPUT NEW_OUTPUT_DIRECTORY | check RAW_DIR \
+                 [--labels PLANES] [--gpu yes|NAME] [--matrix JSON] [--look natural|dark] [--moving blur|sharp] | correct OUTPUT_DIR [--gpu yes|NAME] | recompose OUTPUT_DIR --moving blur|sharp [--gpu yes|NAME] | inspect INPUT | levels INPUT | develop INPUT NEW_OUTPUT_DIRECTORY | check RAW_DIR \
                  | ingest RAW_DIR NEW_STORE [FIRST [LAST]] | register STORE [--lens-from MODEL_JSON] \
                  | separate STORE [--labels PLANES] [--lens NAME] \
-                 | stack STORE [--sigma PX] [--radius PX] [--gpu yes|NAME] [--lit NAME,NAME…] \
-                 | hero STORE --hero NAME --first NAME [--foreground frame|long] [--lit NAME,…] [--labels PLANES] [--lens NAME] [--gpu yes|NAME] \
+                 | stack STORE [--sigma PX] [--radius PX] [--gpu yes|NAME] [--lit NAME,NAME…] [--moving blur|sharp] \
+                 | hero STORE --hero NAME --first NAME [--foreground frame|long] [--moving blur|sharp] [--lit NAME,…] [--labels PLANES] [--lens NAME] [--gpu yes|NAME] \
                  | moment STORE --centre NAME [--half N] \
-                 | render STORE PLANES OUT_PREFIX [--matrix JSON] [--look natural|dark] [--side PX] [--single yes] [--linear yes] \
+                 | render STORE PLANES OUT_PREFIX [--matrix JSON] [--look natural|dark] [--side PX] [--single yes] [--linear yes] [--hdr HEADROOM] \
                  | flat INPUT [LENS]",
             ));
         }

@@ -52,7 +52,9 @@ point the screen tests at a processed folder, a RAW folder and a stopped run).
 
 `correct OUTPUT_DIR [--gpu yes|NAME]` runs a finished run again from its matte with the
 corrections in its store (`store/corrections.json`, the strokes the app paints), reusing the
-saved statistics.
+saved statistics. Moving foreground (swaying branches, water) keeps the long exposure's blur
+unless `process … --moving sharp` takes it from the reference minutes instead;
+`recompose OUTPUT_DIR --moving blur|sharp` (or Scene's switch) changes a finished run.
 
 `process` itself resumes too: run the same command into the same output folder and it keeps
 the finished stages, removes what the interrupted stage left in the store, and goes on.

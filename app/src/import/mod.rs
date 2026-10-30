@@ -250,6 +250,7 @@ impl Import {
                     matrix: None,
                     look: render::NATURAL,
                     rematte: false,
+                    sharp_moving: false,
                 },
                 &survey,
                 &budget,

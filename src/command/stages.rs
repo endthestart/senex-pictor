@@ -8,6 +8,16 @@ use std::collections::HashMap;
 use std::ffi::OsString;
 use std::path::Path;
 
+/// `--moving blur|sharp`: whether moving foreground keeps the long exposure's blur (the
+/// default) or comes from the reference minutes.
+fn sharp_moving(options: &HashMap<String, String>) -> Result<bool> {
+    match options.get("--moving").map(String::as_str) {
+        None | Some("blur") => Ok(false),
+        Some("sharp") => Ok(true),
+        Some(other) => Err(error(format!("--moving {other}: blur or sharp"))),
+    }
+}
+
 /// `--name value` pairs from `rest`, each name one of `allowed`.
 pub fn flags(rest: &[OsString], allowed: &[&str]) -> Result<HashMap<String, String>> {
     let mut out = HashMap::new();
@@ -103,7 +113,7 @@ pub fn stage(
             )?)
         }
         "stack" => {
-            let o = flags(rest, &["--sigma", "--radius", "--gpu", "--lit"])?;
+            let o = flags(rest, &["--sigma", "--radius", "--gpu", "--lit", "--moving"])?;
             let number = |name: &str, default: f64| -> Result<f64> {
                 o.get(name).map_or(Ok(default), |v| {
                     v.parse().map_err(|e| error(format!("{name}: {e}")))
@@ -119,6 +129,7 @@ pub fn stage(
                 kernel,
                 gpu: device.as_ref(),
                 lit: &lit,
+                sharp_moving: sharp_moving(&o)?,
             };
             json(integrate::stack(&store, &options, budget)?)
         }
@@ -133,6 +144,7 @@ pub fn stage(
                     "--gpu",
                     "--foreground",
                     "--lit",
+                    "--moving",
                 ],
             )?;
             let labels = labels_from(o.get("--labels"))?;
@@ -141,7 +153,10 @@ pub fn stage(
             let lit = lit(&store, &o)?;
             let foreground = match o.get("--foreground").map(String::as_str) {
                 None | Some("frame") => hero::Foreground::Frame,
-                Some("long") => hero::Foreground::LongExposure { lit: &lit },
+                Some("long") => hero::Foreground::LongExposure {
+                    lit: &lit,
+                    sharp_moving: sharp_moving(&o)?,
+                },
                 Some(other) => return Err(error(format!("--foreground {other}: frame or long"))),
             };
             let options = hero::Options {
@@ -189,7 +204,7 @@ pub fn process(
         rest,
         &[
             "--run", "--first", "--last", "--hero", "--lens", "--labels", "--gpu", "--matrix",
-            "--look",
+            "--look", "--moving",
         ],
     )?;
     let labels = labels_from(o.get("--labels"))?;
@@ -212,16 +227,28 @@ pub fn process(
             matrix: o.get("--matrix").map(Path::new),
             look: look(&o)?,
             rematte: false,
+            sharp_moving: sharp_moving(&o)?,
         },
         &survey,
         budget,
     )
 }
 
-/// `correct OUT_DIR`: the finished run in OUT_DIR again with its store's matte corrections.
+/// `correct OUT_DIR`: the finished run in OUT_DIR again from its matte, with its store's
+/// corrections.
 pub fn correct(out: &Path, rest: &[OsString], budget: &Budget) -> Result<crate::process::Report> {
     let o = flags(rest, &["--gpu"])?;
-    crate::process::correct(out, gpu(&o)?.as_ref(), budget)
+    crate::process::redo(out, crate::process::Redo::Matte, gpu(&o)?.as_ref(), budget)
+}
+
+/// `recompose OUT_DIR --moving blur|sharp`: the finished run in OUT_DIR again from its
+/// composite, with moving foreground blurred or sharp.
+pub fn recompose(out: &Path, rest: &[OsString], budget: &Budget) -> Result<crate::process::Report> {
+    let o = flags(rest, &["--gpu", "--moving"])?;
+    let what = crate::process::Redo::Composite {
+        sharp_moving: sharp_moving(&o)?,
+    };
+    crate::process::redo(out, what, gpu(&o)?.as_ref(), budget)
 }
 
 pub fn render(dir: &Path, planes: &str, out: &Path, rest: &[OsString]) -> Result<review::Report> {

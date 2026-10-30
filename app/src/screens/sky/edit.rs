@@ -27,7 +27,12 @@ impl Sky {
         self.applying = Some(Job::start("Applying the corrections", move |progress| {
             corrections::save(&Store::open(&dir)?, &strokes)?;
             let gpu = settings.gpu()?;
-            process::correct(&out, gpu.as_ref(), &settings.budget(progress)?)
+            process::redo(
+                &out,
+                process::Redo::Matte,
+                gpu.as_ref(),
+                &settings.budget(progress)?,
+            )
         }));
     }
 
