@@ -4,10 +4,10 @@
 
 use crate::scene::{self, Scene};
 use crate::synthetic;
-use star_photos::process::Report;
-use star_photos::sequence::Survey;
-use star_photos::store::Store;
-use star_photos::{Result, error, input};
+use pictor_engine::process::Report;
+use pictor_engine::sequence::Survey;
+use pictor_engine::store::Store;
+use pictor_engine::{Result, error, input};
 use std::path::{Path, PathBuf};
 
 pub enum Kind {
@@ -32,7 +32,7 @@ pub fn classify(path: &Path) -> Result<Kind> {
     }
     if let Some(report) = Report::load(path).map_err(|e| {
         error(format!(
-            "{}: its process.json is from another version of Star Photos ({e}); process the \
+            "{}: its process.json is from another version of Pictor ({e}); process the \
              RAW folder again",
             path.display()
         ))
@@ -50,7 +50,7 @@ pub fn classify(path: &Path) -> Result<Kind> {
         return Ok(Kind::Raw(path.into()));
     }
     Err(error(format!(
-        "{} holds no RAW files and no Star Photos results",
+        "{} holds no RAW files and no Pictor results",
         path.display()
     )))
 }

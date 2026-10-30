@@ -3,7 +3,7 @@
 Status: accepted, 2026-10-25 (owner direction). Supersedes the LightCraft-only reading
 of P14; ADR 0004 still governs how vendored source is pinned and inventoried.
 
-Star Photos is entirely open source. For every component (RAW decoding, camera level
+Pictor is entirely open source. For every component (RAW decoding, camera level
 and color data, calibration, demosaic, lens geometry, star detection, registration,
 UI, GPU) first look for maintained open-source implementations and data, and record
 license, maintenance and fit in the [reuse audit](../reuse-audit.md).
@@ -13,7 +13,7 @@ license, maintenance and fit in the [reuse audit](../reuse-audit.md).
 - Licensing complicated or incompatible with the outbound license (still undecided):
   use it as a test oracle only. Pin the oracle's revision and hashes in ignored
   `.sources/`, never redistribute it, and implement independently. Copying code or
-  data values from an oracle into Star Photos is not an independent implementation.
+  data values from an oracle into Pictor is not an independent implementation.
 - Oracles come first; adoption is revisited only where oracle comparison is not
   enough.
 - Bugs found and features built in upstream projects go back upstream with evidence.
@@ -22,4 +22,4 @@ license, maintenance and fit in the [reuse audit](../reuse-audit.md).
 
 Consequences: building an algorithm or table starts with a search for an existing
 implementation. Oracle disagreements are findings, not automatic corrections: each
-needs a source or measurement before Star Photos changes behavior.
+needs a source or measurement before Pictor changes behavior.

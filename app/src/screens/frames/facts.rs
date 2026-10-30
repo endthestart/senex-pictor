@@ -3,8 +3,8 @@
 
 use crate::project::Run;
 use egui::ColorImage;
-use star_photos::store::Store;
-use star_photos::{Result, error};
+use pictor_engine::store::Store;
+use pictor_engine::{Result, error};
 
 /// Long side of the larger preview read from the store.
 const PREVIEW_SIDE: usize = 1600;

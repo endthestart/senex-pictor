@@ -1,6 +1,6 @@
 # Project planning index
 
-Agreed with Michael Anderson on 2026-10-25. Working name: Star Photos.
+Agreed with Michael Anderson on 2026-10-25. Working name: Star Photos; named Pictor (SENEX Pictor) on 2026-10-29.
 
 - [Agent handoff](HANDOFF.md): start here to take over implementation.
 - [Requirements](requirements.md): accepted product scope and traceable requirements.

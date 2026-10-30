@@ -8,7 +8,7 @@ use std::path::Path;
 /// Long side of a treatment's preview.
 const PREVIEW_SIDE: u32 = 1600;
 
-fn decode(path: &Path) -> star_photos::Result<ColorImage> {
+fn decode(path: &Path) -> pictor_engine::Result<ColorImage> {
     let image = image::open(path)?
         .thumbnail(PREVIEW_SIDE, PREVIEW_SIDE)
         .into_rgb8();

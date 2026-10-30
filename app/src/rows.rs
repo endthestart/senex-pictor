@@ -1,13 +1,13 @@
 //! What the frame says about the app's state: the header's name and chips, each step's state
 //! in a word or two, and the status line.
 
-use crate::app::{StarPhotos, Workspace};
+use crate::app::{Pictor, Workspace};
 use crate::import::Import;
 use crate::session::Session;
 use crate::shell::{State, Step, StepRow};
 use crate::widgets::Icon;
 
-pub fn header(app: &StarPhotos) -> (String, Vec<String>) {
+pub fn header(app: &Pictor) -> (String, Vec<String>) {
     let name = match &app.workspace {
         Workspace::Empty | Workspace::Loading(_) => String::new(),
         Workspace::Import(i) => crate::project::name(&i.raw),
@@ -16,7 +16,7 @@ pub fn header(app: &StarPhotos) -> (String, Vec<String>) {
     (name, app.chips.clone())
 }
 
-pub fn status(app: &StarPhotos) -> (Option<Icon>, String) {
+pub fn status(app: &Pictor) -> (Option<Icon>, String) {
     match &app.workspace {
         Workspace::Empty => (None, "Open a folder of RAW files to begin".into()),
         Workspace::Loading(job) => (None, format!("{}…", job.label)),
@@ -73,7 +73,7 @@ fn waiting(step: Step, detail: &str) -> StepRow {
     row(step, State::Unavailable, detail)
 }
 
-pub fn steps(app: &StarPhotos) -> Vec<StepRow> {
+pub fn steps(app: &Pictor) -> Vec<StepRow> {
     let later = |first: StepRow, detail: &str| {
         let mut rows = vec![first];
         rows.extend(Step::ALL[1..].iter().map(|&s| waiting(s, detail)));

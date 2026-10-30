@@ -8,10 +8,10 @@ use crate::session::Session;
 use crate::theme::{ACCENT, CARD, LINE, MUTED, WARN};
 use crate::widgets::{self, card, section};
 use egui::{Color32, CornerRadius, Rect, RichText, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
-use star_photos::budget::Budget;
-use star_photos::integrate::{cfa, hero, moment};
-use star_photos::store::Store;
-use star_photos::{process, render, review};
+use pictor_engine::budget::Budget;
+use pictor_engine::integrate::{cfa, hero, moment};
+use pictor_engine::store::Store;
+use pictor_engine::{process, render, review};
 use std::path::Path;
 
 pub struct Making {
@@ -20,7 +20,7 @@ pub struct Making {
 }
 
 /// Renders result `name` of the store in `out` to `out/name.jpg` for its preview.
-fn preview(store: &Store, out: &Path, name: &str) -> star_photos::Result<()> {
+fn preview(store: &Store, out: &Path, name: &str) -> pictor_engine::Result<()> {
     review::render(
         store,
         &review::Options {
@@ -37,7 +37,7 @@ fn preview(store: &Store, out: &Path, name: &str) -> star_photos::Result<()> {
     Ok(())
 }
 
-fn budget(progress: star_photos::progress::Progress) -> star_photos::Result<Budget> {
+fn budget(progress: pictor_engine::progress::Progress) -> pictor_engine::Result<Budget> {
     let mut b = Budget::from_free()?;
     b.progress = progress;
     Ok(b)

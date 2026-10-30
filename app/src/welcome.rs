@@ -19,7 +19,7 @@ pub fn show(ui: &mut Ui, error: Option<&str>) -> Option<Action> {
         ui.add_space((ui.available_height() * 0.16).max(24.0));
         widgets::icon(ui, Icon::Star, 44.0);
         ui.add_space(8.0);
-        ui.label(RichText::new("Star Photos").font(theme::semibold(30.0)));
+        ui.label(RichText::new("Pictor").font(theme::semibold(30.0)));
         ui.label(
             RichText::new("A night of sky, stacked over a sharp foreground.")
                 .color(MUTED)
@@ -67,7 +67,7 @@ pub fn show(ui: &mut Ui, error: Option<&str>) -> Option<Action> {
             ui.add_space((ui.available_width() - w).max(0.0) / 2.0);
             if ui.link("Open a scene file…").clicked()
                 && let Some(file) = rfd::FileDialog::new()
-                    .add_filter("Star Photos scene", &["scene"])
+                    .add_filter("Pictor scene", &["scene"])
                     .pick_file()
             {
                 action = Some(Action::Open(file));

@@ -7,8 +7,8 @@ use super::Lookups;
 use crate::theme::{GOOD, MUTED, WARN};
 use crate::widgets::{Icon, bytes, duration};
 use egui::Color32;
-use star_photos::process::{self, disk};
-use star_photos::review;
+use pictor_engine::process::{self, disk};
+use pictor_engine::review;
 
 pub struct Check {
     pub icon: Icon,

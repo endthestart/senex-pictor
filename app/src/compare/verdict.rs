@@ -2,8 +2,8 @@
 //! so a comparison survives closing the app. Verdicts belong to a pair of renderings; a
 //! different pair starts afresh.
 
+use pictor_engine::Result;
 use serde::{Deserialize, Serialize};
-use star_photos::Result;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 

@@ -1,7 +1,7 @@
-# Star Photos
+# SENEX Pictor
 
-An open-source standalone nightscape stacker in development, written in Rust.
-Working name; no public release yet.
+An open-source standalone nightscape stacker in development, written in Rust. The app and
+its command are `pictor` (Pictor.app on macOS); no public release yet.
 
 Taking over development? Read the [agent handoff](docs/HANDOFF.md) first.
 
@@ -20,7 +20,7 @@ A tested calibration library (`src/calibration/`, proposed ADR 0006) is not yet 
 into this command.
 
 The Rust port of the stacker (plan R1–R6) is complete. One command takes a folder of RAW
-files to a finished image:
+files to a finished image (`pictor COMMAND …` runs any of these without the window):
 
 - `process RAW_DIR NEW_OUTPUT_DIR [--run N] [--first NAME] [--last NAME] [--hero NAME]
   [--lens NAME] [--gpu yes|NAME]`: checks the folder, ingests the recommended run (or the
@@ -42,9 +42,9 @@ the reference); **Sky & ground** tints the sky and the boundary over the result 
 renderings on the GPU (Space swaps in place, S splits, chosen regions as 200% crops with
 A / same / B verdicts saved to `compare.json`); **Look & export** tunes the look live and
 exports the linear 32-bit master, a 16-bit TIFF or a JPEG. Drop a folder on the window or
-run `cargo run --release -p star-photos-app -- [FOLDER] [--step NAME]`.
-`cargo test -p star-photos-app` renders the window headlessly (`STAR_PHOTOS_UI_SHOTS=DIR`
-saves the frames; `STAR_PHOTOS_UI_FOLDER`, `STAR_PHOTOS_UI_RAW` and `STAR_PHOTOS_UI_STOPPED`
+run `cargo run --release -p pictor -- [FOLDER] [--step NAME]`.
+`cargo test -p pictor` renders the window headlessly (`PICTOR_UI_SHOTS=DIR`
+saves the frames; `PICTOR_UI_FOLDER`, `PICTOR_UI_RAW` and `PICTOR_UI_STOPPED`
 point the screen tests at a processed folder, a RAW folder and a stopped run).
 
 `process` itself resumes too: run the same command into the same output folder and it keeps
@@ -81,7 +81,7 @@ The stages also run one at a time:
   float TIFF). The camera's colour matrix comes from `data/colour-matrices.json` unless a file
   is given.
 - `flat INPUT [LENS]`: the lensfun vignetting profile for the file's lens, focal length and
-  aperture (lensfun's database is read in place; set `STAR_PHOTOS_LENSFUN` to choose it).
+  aperture (lensfun's database is read in place; set `PICTOR_LENSFUN` to choose it).
 
 ```sh
 cargo build --release --locked
@@ -107,7 +107,7 @@ The native path does not depend on the Python POC or Python packages.
 ```sh
 cargo test --locked
 cargo clippy --locked --all-targets -- -D warnings
-cargo fmt --package star-photos -- --check
+cargo fmt -p pictor-engine -p pictor -- --check
 python3 tools/verify_sources.py
 ```
 
@@ -134,7 +134,7 @@ Selected LightCraft Classic crates are pinned and vendored with original license
 and notices. See [reuse audit](docs/reuse-audit.md) and
 [source inventory](docs/source-lock.json), pinned to upstream Classic dbe90dc
 (checked 2026-10-25).
-Star Photos is licensed under either of [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at
+Pictor is licensed under either of [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at
 your option. A complete dependency and data attribution audit for distribution remains open.
 
 The prior Python POC and generated baselines remain temporarily for comparison.

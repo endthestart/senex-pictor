@@ -1,7 +1,7 @@
 //! Lookups behind the checks that do not change while frames are chosen.
 
-use star_photos::budget::Budget;
-use star_photos::{input, lens};
+use pictor_engine::budget::Budget;
+use pictor_engine::{input, lens};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 

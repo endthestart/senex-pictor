@@ -45,12 +45,9 @@ impl Shot {
             .iter()
             .map(|p| [p.r(), p.g(), p.b()].map(|v| f32::from(v) / 255.0))
             .collect();
-        match star_photos::export::jpeg(&self.path, &display, w, h, 90) {
-            Ok(()) => eprintln!(
-                "star-photos-app: screenshot saved to {}",
-                self.path.display()
-            ),
-            Err(e) => eprintln!("star-photos-app: screenshot failed: {e}"),
+        match pictor_engine::export::jpeg(&self.path, &display, w, h, 90) {
+            Ok(()) => eprintln!("pictor: screenshot saved to {}", self.path.display()),
+            Err(e) => eprintln!("pictor: screenshot failed: {e}"),
         }
         true
     }

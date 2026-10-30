@@ -1,5 +1,6 @@
 pub mod budget;
 pub mod calibration;
+pub mod command;
 pub mod export;
 pub mod flow;
 pub mod gpu;

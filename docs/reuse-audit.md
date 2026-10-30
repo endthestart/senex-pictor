@@ -13,7 +13,7 @@ Earlier snapshots (lightcraft 701f78e, Classic 6f48dbd) came from the sibling
 checkouts while GitHub was unreachable; both are ancestors of the HEADs above. Fresh
 clones are in `.sources/upstream-*`; the old snapshots remain in `.sources/` for
 comparison. The sibling checkouts are maintained by the LightCraft session (informed
-2026-10-25); Star Photos never pulls, resets or edits them.
+2026-10-25); Pictor never pulls, resets or edits them.
 
 ## Adopted subset
 
@@ -114,7 +114,7 @@ are now vendored verbatim.
 
 ## Existing open-source data and oracles (not adopted)
 
-Camera level and geometry data already maintained elsewhere; Star Photos should not
+Camera level and geometry data already maintained elsewhere; Pictor should not
 re-derive it by measurement. RawTherapee `rtengine/camconst.json` (GPL-3.0) lists
 per-ISO white levels, masked areas and crops (Canon EOS 40D: ISO 100 typical 13825,
 matching local measurement). rawspeed `data/cameras.xml` (LGPL-2.1) lists black, white,
@@ -131,13 +131,13 @@ LightCraft's rules forbid GPL/LGPL data, so it will not adopt these white levels
 
 LightCraft session review (2026-10-25) of the relayed decoder findings: upstream
 LightCraft rejects truncated packed NEF strips (since 001943f01) while Classic keeps
-zero rows by design, so Star Photos needs its own guard or a different source for
+zero rows by design, so Pictor needs its own guard or a different source for
 that path. The fallbacks are intended upstream; an issue requesting level provenance
 is drafted for owner approval. Classic HEAD has since moved to 08f7526c8.
 
 Per ADR 0007 these are test oracles first. rawspeed `cameras.xml` and RawTherapee
 `camconst.json` are pinned in [oracle-lock.json](oracle-lock.json) (ignored
-`.sources/oracles/`); `tools/oracle_levels.py` compares them with `star-photos levels`.
+`.sources/oracles/`); `tools/oracle_levels.py` compares them with `pictor levels`.
 Results over 528 local frames (no decode errors):
 
 | Camera / ISO | Decoded white | Largest stored sample | RawTherapee | rawspeed |

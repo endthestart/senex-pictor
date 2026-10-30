@@ -1,4 +1,4 @@
-//! Star Photos desktop app (ADR 0011): the window, its steps and the GPU pieces they draw
+//! Pictor desktop app (ADR 0011): the window, its steps and the GPU pieces they draw
 //! with. `main.rs` parses the command line and starts it.
 
 pub mod app;

@@ -73,7 +73,7 @@ pub fn tiff16(
     image
         .encoder()
         .write_tag(Tag::ImageDescription, description)?;
-    image.encoder().write_tag(Tag::Software, "Star Photos")?;
+    image.encoder().write_tag(Tag::Software, "Pictor")?;
     image.write_data(&data)?;
     writer.flush()?;
     file.sync_all()?;
@@ -96,7 +96,7 @@ pub fn linear(path: &Path, rgb: &[[f32; 3]], w: usize, h: usize, description: &s
     image
         .encoder()
         .write_tag(Tag::ImageDescription, description)?;
-    image.encoder().write_tag(Tag::Software, "Star Photos")?;
+    image.encoder().write_tag(Tag::Software, "Pictor")?;
     image.write_data(&data)?;
     writer.flush()?;
     file.sync_all()?;

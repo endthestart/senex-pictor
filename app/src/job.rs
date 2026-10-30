@@ -2,8 +2,8 @@
 //! composite, exporting) on its own thread, with the engine's progress and cancel flag shared
 //! with the window.
 
-use star_photos::Result;
-use star_photos::progress::{Progress, Snapshot};
+use pictor_engine::Result;
+use pictor_engine::progress::{Progress, Snapshot};
 use std::sync::mpsc::{Receiver, TryRecvError, channel};
 use std::time::Instant;
 
@@ -39,7 +39,7 @@ impl<T: Send + 'static> Job<T> {
         match self.rx.try_recv() {
             Ok(r) => Some(r),
             Err(TryRecvError::Empty) => None,
-            Err(TryRecvError::Disconnected) => Some(Err(star_photos::error(format!(
+            Err(TryRecvError::Disconnected) => Some(Err(pictor_engine::error(format!(
                 "{} stopped without a result",
                 self.label
             )))),

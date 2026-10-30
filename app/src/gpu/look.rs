@@ -4,7 +4,7 @@
 
 use super::mips::{self, Mips};
 use crate::scene::{LookParams, Scene};
-use star_photos::{Result, error};
+use pictor_engine::{Result, error};
 use std::time::Instant;
 
 pub const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;

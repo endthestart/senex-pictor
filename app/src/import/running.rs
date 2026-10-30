@@ -5,7 +5,7 @@ use super::Import;
 use crate::theme::{MUTED, WARN};
 use crate::widgets::{self, Icon, card, duration, section, strong};
 use egui::{RichText, Ui};
-use star_photos::progress::{Snapshot, StageState};
+use pictor_engine::progress::{Snapshot, StageState};
 
 /// The engine's stage names, for people.
 pub fn stage_label(name: &str) -> &str {

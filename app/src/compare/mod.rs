@@ -11,9 +11,9 @@ use crate::theme::MUTED;
 use crate::viewer::{Canvas, Viewer, Zoom};
 use crate::widgets::{self, card, section, strong};
 use egui::{RichText, Ui};
+use pictor_engine::Result;
+use pictor_engine::render::{self, Look};
 use regions::Region;
-use star_photos::Result;
-use star_photos::render::{self, Look};
 use std::path::PathBuf;
 use verdict::{Choice, Verdicts};
 

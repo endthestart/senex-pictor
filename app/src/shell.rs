@@ -61,7 +61,7 @@ pub fn header(ui: &mut Ui, name: &str, chips: &[String]) {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
                 widgets::icon(ui, Icon::Star, 20.0);
-                ui.label(RichText::new("Star Photos").font(theme::semibold(15.0)));
+                ui.label(RichText::new("Pictor").font(theme::semibold(15.0)));
                 if !name.is_empty() {
                     ui.label(RichText::new(name).color(MUTED));
                 }

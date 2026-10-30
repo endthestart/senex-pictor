@@ -3,12 +3,12 @@
 //! each frame is submitted and waited for, so the times are what the GPU needs, independent of
 //! the display. In the window: a scripted pan, zoom and swap with each frame's interval.
 
-use crate::app::{StarPhotos, Workspace};
+use crate::app::{Pictor, Workspace};
 use crate::gpu::canvas::{self, CanvasGpu, View};
 use crate::gpu::look::{FORMAT, Looks};
 use crate::scene::LookParams;
 use crate::stats;
-use star_photos::{Result, error};
+use pictor_engine::{Result, error};
 use std::time::Instant;
 
 const FRAMES: usize = 120;
@@ -117,7 +117,7 @@ impl Window {
     }
 }
 
-impl StarPhotos {
+impl Pictor {
     /// Drives a scripted run once the comparison is up: records frame intervals per phase and
     /// ends it, printing the report.
     pub(crate) fn bench_frame(&mut self, ctx: &egui::Context) {

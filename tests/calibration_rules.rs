@@ -1,7 +1,7 @@
 mod support;
 
-use star_photos::Result;
-use star_photos::calibration::{Estimator, Mosaic, Role, build_flat, build_master, calibrate};
+use pictor_engine::Result;
+use pictor_engine::calibration::{Estimator, Mosaic, Role, build_flat, build_master, calibrate};
 use support::*;
 
 #[test]
@@ -237,7 +237,7 @@ fn dark_temperature_differences_are_reported() -> Result<()> {
     let dark = build_master(Role::Dark, &darks, Estimator::Mean)?;
     let scene = light_scene(BACKGROUND);
     let mut light = mosaic(expose(&sensor, &scene, &mut Rng::new(131)), &scene)?;
-    let temperature = |r: &star_photos::calibration::Report| {
+    let temperature = |r: &pictor_engine::calibration::Report| {
         r.warnings
             .iter()
             .find(|w| w.subject == "temperature")

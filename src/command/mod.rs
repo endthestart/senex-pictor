@@ -1,7 +1,10 @@
-mod cli;
+//! The command-line tools: `pictor [--memory GB] COMMAND …` runs one stage, a whole process
+//! or a diagnostic without the window.
 
-use star_photos::budget::Budget;
-use star_photos::{Result, error, input, lens, output, pipeline, sequence, store};
+mod stages;
+
+use crate::budget::Budget;
+use crate::{Result, error, input, lens, output, pipeline, sequence, store};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
@@ -42,8 +45,20 @@ fn select(paths: Vec<PathBuf>, bounds: &[OsString]) -> Result<Vec<PathBuf>> {
     Ok(paths[first..=last].to_vec())
 }
 
-fn run() -> Result<()> {
-    let mut args: Vec<_> = std::env::args_os().skip(1).collect();
+/// The tools' command names; any other first argument is for the app.
+pub const COMMANDS: [&str; 13] = [
+    "process", "inspect", "levels", "develop", "check", "ingest", "register", "separate", "stack",
+    "hero", "moment", "render", "flat",
+];
+
+/// Whether `args` (without the program name) ask for a tool rather than the app.
+pub fn wanted(args: &[OsString]) -> bool {
+    args.first()
+        .is_some_and(|a| a == "--memory" || COMMANDS.iter().any(|c| a == c))
+}
+
+/// Runs the tool `args` ask for, printing its report as JSON.
+pub fn run(mut args: Vec<OsString>) -> Result<()> {
     let budget = match memory(&mut args)? {
         Some(gb) => Budget::of(gb)?,
         None => Budget::from_free()?,
@@ -95,18 +110,18 @@ fn run() -> Result<()> {
             );
         }
         [command, raw, out, rest @ ..] if command == "process" => {
-            let report = cli::process(Path::new(raw), Path::new(out), rest, &budget)?;
+            let report = stages::process(Path::new(raw), Path::new(out), rest, &budget)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
         [command, dir, rest @ ..]
             if ["register", "separate", "stack", "hero", "moment"]
                 .contains(&command.to_string_lossy().as_ref()) =>
         {
-            let report = cli::stage(&command.to_string_lossy(), Path::new(dir), rest, &budget)?;
+            let report = stages::stage(&command.to_string_lossy(), Path::new(dir), rest, &budget)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
         [command, dir, planes, out, rest @ ..] if command == "render" => {
-            let report = cli::render(
+            let report = stages::render(
                 Path::new(dir),
                 &planes.to_string_lossy(),
                 Path::new(out),
@@ -122,7 +137,7 @@ fn run() -> Result<()> {
                     .metadata
                     .lens_model
                     .ok_or_else(|| {
-                        error("no lens model in the file; pass it: star-photos flat RAW \"LENS\"")
+                        error("no lens model in the file; pass it: pictor flat RAW \"LENS\"")
                     })?,
             };
             let (focal, aperture) = info
@@ -147,7 +162,7 @@ fn run() -> Result<()> {
         }
         _ => {
             return Err(error(
-                "usage: star-photos [--memory GB] process RAW_DIR NEW_OUTPUT_DIR [--run N] [--first NAME] [--last NAME] [--hero NAME] [--lens NAME] \
+                "usage: pictor [--memory GB] process RAW_DIR NEW_OUTPUT_DIR [--run N] [--first NAME] [--last NAME] [--hero NAME] [--lens NAME] \
                  [--labels PLANES] [--gpu yes|NAME] [--matrix JSON] [--look natural|dark] | inspect INPUT | levels INPUT | develop INPUT NEW_OUTPUT_DIRECTORY | check RAW_DIR \
                  | ingest RAW_DIR NEW_STORE [FIRST [LAST]] | register STORE [--lens-from MODEL_JSON] \
                  | separate STORE [--labels PLANES] [--lens NAME] \
@@ -160,14 +175,4 @@ fn run() -> Result<()> {
         }
     }
     Ok(())
-}
-
-fn main() -> std::process::ExitCode {
-    match run() {
-        Ok(()) => std::process::ExitCode::SUCCESS,
-        Err(e) => {
-            eprintln!("star-photos: {e}");
-            std::process::ExitCode::FAILURE
-        }
-    }
 }

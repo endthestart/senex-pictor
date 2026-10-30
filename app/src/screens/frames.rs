@@ -125,7 +125,7 @@ pub fn show(ui: &mut Ui, s: &mut Session) {
     let lit_used = f.lit.iter().filter(|n| f.names.contains(n)).count();
     widgets::heading(ui, "Frames");
     let drift = match (f.widest, &f.reference) {
-        (Some(w), Some(r)) if w > star_photos::process::DRIFT_PX => format!(
+        (Some(w), Some(r)) if w > pictor_engine::process::DRIFT_PX => format!(
             " The foreground drifted, up to {w:.0} px from the middle frame, so the image is built around {r}."
         ),
         (Some(w), _) => format!(" The foreground held still ({w:.1} px at most)."),

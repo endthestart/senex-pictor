@@ -6,7 +6,7 @@ use crate::theme::{ACCENT, CARD, LINE, MUTED, TEXT, WARN};
 use crate::thumbs::Thumbs;
 use crate::widgets::{card, legend, section};
 use egui::{Color32, CornerRadius, Rect, RichText, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
-use star_photos::sequence::Survey;
+use pictor_engine::sequence::Survey;
 
 const CHART_HEIGHT: f32 = 120.0;
 const DRIFT_SCALE: f64 = 10.0;

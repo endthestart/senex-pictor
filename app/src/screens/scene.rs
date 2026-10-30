@@ -69,7 +69,7 @@ fn treatments(s: &Session, run: &Run, frame: Option<&str>) -> Vec<Treatment> {
         result: stem.as_ref().map(|f| format!("hero-{f}")),
         tag: None,
     };
-    let possible = star_photos::integrate::moment::possible(&run.store);
+    let possible = pictor_engine::integrate::moment::possible(&run.store);
     let moment = Treatment {
         title: "Short-window moment",
         note: if possible {

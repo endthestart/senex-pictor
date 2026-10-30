@@ -8,8 +8,8 @@ use crate::theme::MUTED;
 use crate::viewer::Viewer;
 use crate::widgets::{self, card, mono, section};
 use egui::{RichText, Ui};
-use star_photos::review;
-use star_photos::store::Store;
+use pictor_engine::review;
+use pictor_engine::store::Store;
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Copy, PartialEq)]

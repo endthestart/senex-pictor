@@ -1,8 +1,8 @@
 mod support;
 
 use lcc_raw::BlackLevel;
-use star_photos::Result;
-use star_photos::calibration::{Estimator, Master, Mosaic, Role, build_master};
+use pictor_engine::Result;
+use pictor_engine::calibration::{Estimator, Master, Mosaic, Role, build_master};
 use support::*;
 
 /// Expected dark level above black and its single-frame standard deviation at each site.

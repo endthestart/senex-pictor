@@ -15,10 +15,10 @@ pub use running::stage_label;
 
 use crate::job::Job;
 use crate::thumbs::Thumbs;
-use star_photos::budget::Budget;
-use star_photos::process::{self, Report};
-use star_photos::sequence::{Run, Survey};
-use star_photos::{Result, error, render};
+use pictor_engine::budget::Budget;
+use pictor_engine::process::{self, Report};
+use pictor_engine::sequence::{Run, Survey};
+use pictor_engine::{Result, error, render};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -43,7 +43,7 @@ pub struct Import {
     show_short_runs: bool,
 }
 
-/// Where a RAW folder's run goes unless another folder is chosen: `~/Pictures/Star Photos/`
+/// Where a RAW folder's run goes unless another folder is chosen: `~/Pictures/Pictor/`
 /// and the folder's name (its parent's when it is called "raw"), numbered when taken.
 pub fn default_out(raw: &Path) -> Result<PathBuf> {
     let home = std::env::var_os("HOME")
@@ -53,7 +53,7 @@ pub fn default_out(raw: &Path) -> Result<PathBuf> {
     if name.eq_ignore_ascii_case("raw") {
         name = raw.parent().and_then(named).unwrap_or(name);
     }
-    let base = PathBuf::from(home).join("Pictures").join("Star Photos");
+    let base = PathBuf::from(home).join("Pictures").join("Pictor");
     let mut out = base.join(&name);
     let mut k = 2;
     while out.exists() {
@@ -68,7 +68,7 @@ impl Import {
     pub fn raw(raw: PathBuf) -> Import {
         let (out, error) = match default_out(&raw) {
             Ok(o) => (o, None),
-            Err(e) => (raw.join("star-photos"), Some(e.to_string())),
+            Err(e) => (raw.join("Pictor"), Some(e.to_string())),
         };
         let folder = raw.clone();
         Import {

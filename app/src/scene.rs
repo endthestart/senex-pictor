@@ -4,10 +4,10 @@
 //! the CPU as the renderer does.
 
 use half::f16;
-use star_photos::render::{self, Look};
-use star_photos::review;
-use star_photos::store::Store;
-use star_photos::{Result, error};
+use pictor_engine::render::{self, Look};
+use pictor_engine::review;
+use pictor_engine::store::Store;
+use pictor_engine::{Result, error};
 use std::path::Path;
 
 /// One look's parameters as the compute shader reads them (`look.wgsl` `Look`).
@@ -198,7 +198,7 @@ pub fn open(path: &Path) -> Result<Scene> {
     let header = 20 + 2 * look_size;
     if bytes.len() < header || &bytes[..8] != MAGIC {
         return Err(error(format!(
-            "{} is not a Star Photos scene file",
+            "{} is not a Pictor scene file",
             path.display()
         )));
     }

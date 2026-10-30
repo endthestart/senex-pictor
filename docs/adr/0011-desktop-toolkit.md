@@ -8,7 +8,7 @@ spike on an Apple M2 Max and agreed to proceed.
 
 The app must show 24–45 MP stacks with smooth zoom, pan and 100% inspection, swap two renderings
 with nothing in between (the comparison research's instant toggle), recompute looks live, and
-show colour accurately on wide-gamut Mac screens. Star Photos already computes on wgpu 30.
+show colour accurately on wide-gamut Mac screens. Pictor already computes on wgpu 30.
 LightCraft and LightCraft Classic, the owner's Rust photo editors, use egui/eframe on wgpu 30.
 
 ## Decision

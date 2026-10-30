@@ -10,8 +10,8 @@ use crate::display::Display;
 use crate::gpu::canvas::CanvasGpu;
 use crate::gpu::look::Looks;
 use crate::scene::{self, LookParams, Scene};
-use star_photos::Result;
-use star_photos::render::{self, Look};
+use pictor_engine::Result;
+use pictor_engine::render::{self, Look};
 
 pub struct Viewer {
     device: wgpu::Device,

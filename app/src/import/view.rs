@@ -175,17 +175,17 @@ impl Import {
     /// inside it named after the RAW folder.
     fn choose_out(&mut self, dir: std::path::PathBuf) {
         let empty = std::fs::read_dir(&dir).is_ok_and(|mut d| d.next().is_none());
-        let ours = dir.join(star_photos::process::journal::FILE).exists();
+        let ours = dir.join(pictor_engine::process::journal::FILE).exists();
         self.out = if empty || ours {
             dir
         } else {
             let name = super::default_out(&self.raw)
                 .ok()
                 .and_then(|p| p.file_name().map(|n| n.to_os_string()))
-                .unwrap_or_else(|| "Star Photos".into());
+                .unwrap_or_else(|| "Pictor".into());
             dir.join(name)
         };
-        self.interrupted = star_photos::process::Report::load(&self.out)
+        self.interrupted = pictor_engine::process::Report::load(&self.out)
             .ok()
             .flatten()
             .filter(|r| !r.complete);

@@ -14,7 +14,7 @@ def main():
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
-    binary = Path("target/release/star-photos").resolve()
+    binary = Path("target/release/pictor").resolve()
     corpus = json.loads(args.inventory.read_text())
     results = {"schema": 1, "header_checks": [], "development_checks": [],
                "complete": False, "platform": subprocess.check_output(

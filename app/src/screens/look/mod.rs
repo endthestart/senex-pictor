@@ -15,7 +15,7 @@ use controls::{BLACK, Control, SATURATION, SHADOWS, STRETCH, WHITE};
 use egui::{RichText, Ui};
 use export::Format;
 use half::f16;
-use star_photos::render::{self, Look};
+use pictor_engine::render::{self, Look};
 
 const PRESETS: [(&str, &str, Look); 2] = [
     (

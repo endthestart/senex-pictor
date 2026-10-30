@@ -1,10 +1,10 @@
 [package]
-name = "star-photos"
+name = "pictor-engine"
 version = "0.1.0"
 edition = "2024"
 publish = false
 license = "MIT OR Apache-2.0"
-description = "Full-resolution nightscape processing research"
+description = "Pictor's nightscape engine: RAW sequences to a stacked sky and an as-shot foreground"
 
 [workspace]
 members = ["app"]

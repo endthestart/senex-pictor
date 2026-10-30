@@ -1,11 +1,11 @@
-use star_photos::Result;
-use star_photos::sky::Camera;
-use star_photos::sky::drift::free_rotations;
-use star_photos::sky::fit::{Start, fit};
-use star_photos::sky::model::{SIDEREAL_RAD_PER_S, apply, rotation};
-use star_photos::sky::report::held_out;
-use star_photos::stars::similarity::Random;
-use star_photos::stars::{Star, detect, track};
+use pictor_engine::Result;
+use pictor_engine::sky::Camera;
+use pictor_engine::sky::drift::free_rotations;
+use pictor_engine::sky::fit::{Start, fit};
+use pictor_engine::sky::model::{SIDEREAL_RAD_PER_S, apply, rotation};
+use pictor_engine::sky::report::held_out;
+use pictor_engine::stars::similarity::Random;
+use pictor_engine::stars::{Star, detect, track};
 
 fn uniform(r: &mut Random) -> f64 {
     (r.next_u64() >> 11) as f64 / (1u64 << 53) as f64

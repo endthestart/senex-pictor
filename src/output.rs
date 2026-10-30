@@ -52,7 +52,7 @@ fn write(dir: &Path, image: &Rgb32f, source: &Identity, development: &Developmen
         .write_tag(Tag::ImageDescription, json.as_str())?;
     frame
         .encoder()
-        .write_tag(Tag::Software, "Star Photos RAW diagnostic 0.1.0")?;
+        .write_tag(Tag::Software, "Pictor RAW diagnostic 0.1.0")?;
     frame.encoder().write_tag(Tag::Orientation, 1u16)?;
     let flat: &[f32] = image.data.as_flattened();
     if flat.len()

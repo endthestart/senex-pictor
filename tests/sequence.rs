@@ -1,5 +1,5 @@
-use star_photos::Result;
-use star_photos::sequence::{Capture, Settings, Steps, check};
+use pictor_engine::Result;
+use pictor_engine::sequence::{Capture, Settings, Steps, check};
 
 fn settings() -> Settings {
     Settings {

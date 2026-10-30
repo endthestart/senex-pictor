@@ -5,7 +5,7 @@
 
 use egui::{ColorImage, TextureHandle, TextureOptions};
 use half::f16;
-use star_photos::sequence::Thumb;
+use pictor_engine::sequence::Thumb;
 
 /// Stretch strength of the asinh curve.
 const STRETCH: f32 = 10.0;

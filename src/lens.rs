@@ -10,7 +10,7 @@ use quick_xml::events::{BytesStart, Event};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
-/// Where lensfun's XML database is looked for when `STAR_PHOTOS_LENSFUN` is unset.
+/// Where lensfun's XML database is looked for when `PICTOR_LENSFUN` is unset.
 const KNOWN_DATABASES: &[&str] = &[
     "/Applications/darktable.app/Contents/Resources/share/lensfun/version_1",
     "/opt/homebrew/share/lensfun/version_1",
@@ -27,15 +27,15 @@ pub struct Vignetting {
     pub database: PathBuf,
 }
 
-/// The lensfun database directory: `STAR_PHOTOS_LENSFUN`, else the first known location.
+/// The lensfun database directory: `PICTOR_LENSFUN`, else the first known location.
 pub fn database() -> Result<PathBuf> {
-    if let Some(dir) = std::env::var_os("STAR_PHOTOS_LENSFUN") {
+    if let Some(dir) = std::env::var_os("PICTOR_LENSFUN") {
         let dir = PathBuf::from(dir);
         return if dir.is_dir() {
             Ok(dir)
         } else {
             Err(error(format!(
-                "STAR_PHOTOS_LENSFUN is not a directory: {}",
+                "PICTOR_LENSFUN is not a directory: {}",
                 dir.display()
             )))
         };
@@ -46,7 +46,7 @@ pub fn database() -> Result<PathBuf> {
         .find(|dir| dir.is_dir())
         .ok_or_else(|| {
             error(format!(
-                "no lensfun database found; set STAR_PHOTOS_LENSFUN (looked in {})",
+                "no lensfun database found; set PICTOR_LENSFUN (looked in {})",
                 KNOWN_DATABASES.join(", ")
             ))
         })

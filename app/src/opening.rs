@@ -1,7 +1,7 @@
 //! Opening what the user chose (a RAW folder goes to Import; a result is prepared in the
 //! background and opens in the viewer) and advancing what is open: checks, runs, results.
 
-use crate::app::{StarPhotos, Workspace};
+use crate::app::{Pictor, Workspace};
 use crate::import::Import;
 use crate::job::Job;
 use crate::project::{self, Kind, Loaded};
@@ -9,7 +9,7 @@ use crate::session::Session;
 use crate::shell::Step;
 use std::path::PathBuf;
 
-impl StarPhotos {
+impl Pictor {
     pub(crate) fn load(&mut self, job: Job<Loaded>) {
         self.error = None;
         self.workspace = Workspace::Loading(job);
@@ -48,7 +48,7 @@ impl StarPhotos {
         let name = loaded.name.clone();
         match Session::new(rs, self.display.clone(), loaded, self.mp) {
             Ok(s) => {
-                eprintln!("star-photos-app: opened {name}");
+                eprintln!("pictor: opened {name}");
                 self.workspace = Workspace::Open(Box::new(s));
                 self.step = self.next;
             }
@@ -58,7 +58,7 @@ impl StarPhotos {
 
     /// Back to the first screen with `message`, also on stderr for terminal launches.
     pub(crate) fn fail(&mut self, message: String) {
-        eprintln!("star-photos-app: {message}");
+        eprintln!("pictor: {message}");
         self.error = Some(message);
         self.workspace = Workspace::Empty;
         self.step = Step::Import;

@@ -1,6 +1,6 @@
 //! The guided controls on the look's fields.
 
-use star_photos::render::Look;
+use pictor_engine::render::Look;
 
 /// A guided control on one field of the look; `relevel` when moving it changes the levels,
 /// which are measured once the slider is let go.

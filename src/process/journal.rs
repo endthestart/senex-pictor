@@ -90,7 +90,7 @@ pub fn continue_in(out: &Path, fresh: Report) -> Result<Report> {
                     out.display()
                 )));
             }
-            eprintln!("star-photos: resuming the run in {}", out.display());
+            eprintln!("pictor: resuming the run in {}", out.display());
             Ok(r)
         }
     }
@@ -145,7 +145,7 @@ impl<'a> Journal<'a> {
             if running.store_before.is_empty() && store.exists() {
                 std::fs::remove_dir(&store)?;
             }
-            eprintln!("star-photos: rolled back the interrupted {}", running.stage);
+            eprintln!("pictor: rolled back the interrupted {}", running.stage);
         }
         for s in &report.stages {
             progress.resumed(&s.name, s.seconds);
@@ -195,7 +195,7 @@ impl<'a> Journal<'a> {
             store_before: listing(&self.out.join("store"))?,
         });
         self.save()?;
-        eprintln!("star-photos: {name}…");
+        eprintln!("pictor: {name}…");
         self.progress.begin(name);
         let start = Instant::now();
         let value = run().map_err(|e| {
@@ -207,7 +207,7 @@ impl<'a> Journal<'a> {
         })?;
         let seconds = start.elapsed().as_secs_f64();
         eprintln!(
-            "star-photos: {name} done in {seconds:.0} s ({:.0} s so far)",
+            "pictor: {name} done in {seconds:.0} s ({:.0} s so far)",
             self.clock.elapsed().as_secs_f64()
         );
         self.progress.finish(name, seconds);

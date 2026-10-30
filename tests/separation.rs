@@ -1,9 +1,9 @@
-use star_photos::Result;
-use star_photos::integrate::combine::{Sample, luminance_clipped, weighted};
-use star_photos::separate::filters::distance_squared;
-use star_photos::separate::matte::matte;
-use star_photos::separate::stats::Stats;
-use star_photos::stars::similarity::Random;
+use pictor_engine::Result;
+use pictor_engine::integrate::combine::{Sample, luminance_clipped, weighted};
+use pictor_engine::separate::filters::distance_squared;
+use pictor_engine::separate::matte::matte;
+use pictor_engine::separate::stats::Stats;
+use pictor_engine::stars::similarity::Random;
 
 #[test]
 fn the_distance_transform_is_exact_and_names_the_nearest_pixel() -> Result<()> {

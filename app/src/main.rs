@@ -1,25 +1,25 @@
-//! Star Photos desktop app (ADR 0011): egui on a wgpu device the app creates and shares with the
-//! window, so rendered looks stay on the GPU. Opens a `process` output folder or a store.
+//! Pictor (ADR 0011): egui on a wgpu device the app creates and shares with the window, so
+//! rendered looks stay on the GPU. Opens a folder of RAW files, a `process` output folder or a
+//! store; with a command (`pictor process …`, `pictor stack …`) it runs that tool instead.
 //!
-//! star-photos-app [FOLDER] [--demo yes] [--scene FILE] [--step NAME] [--mp 45] [--gpu NAME] [--hdr no]
+//! pictor [FOLDER] [--demo yes] [--scene FILE] [--step NAME] [--mp 45] [--gpu NAME] [--hdr no]
 //! Developer runs: --bench-window SECONDS (scripted pan, zoom and swap; prints JSON),
 //! --bench-offscreen WxH (GPU times without a window), --save-scene FILE, --screenshot FILE
-//! (save the window once a result is up, then quit). FOLDER is a folder of RAW files, an output
-//! folder or a store; --step opens on import, frames, sky, scene, compare or look.
+//! (save the window once a result is up, then quit). --step opens on import, frames, sky,
+//! scene, compare or look.
 
 use eframe::egui_wgpu::{WgpuSetup, WgpuSetupExisting};
-use star_photos::{Result, error};
-use star_photos_app::project::{self, Kind, Loaded};
-use star_photos_app::shell::Step;
-use star_photos_app::{app, bench, gpu, scene};
+use pictor::project::{self, Kind, Loaded};
+use pictor::shell::Step;
+use pictor::{app, bench, gpu, scene};
+use pictor_engine::{Result, command, error};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-const USAGE: &str = "usage: star-photos-app [FOLDER] [--demo yes] [--scene FILE] [--step NAME] [--mp 45] [--gpu NAME] [--hdr no] \
+const USAGE: &str = "usage: pictor [FOLDER] [--demo yes] [--scene FILE] [--step NAME] [--mp 45] [--gpu NAME] [--hdr no] \
                      [--bench-window SECONDS | --bench-offscreen WxH | --save-scene FILE | --screenshot FILE]";
 
-fn options() -> Result<(Option<PathBuf>, HashMap<String, String>)> {
-    let mut args: Vec<String> = std::env::args().skip(1).collect();
+fn options(mut args: Vec<String>) -> Result<(Option<PathBuf>, HashMap<String, String>)> {
     let folder =
         (!args.is_empty() && !args[0].starts_with("--")).then(|| PathBuf::from(args.remove(0)));
     let mut out = HashMap::new();
@@ -92,7 +92,7 @@ fn headless(
     let p = loaded(folder, o.get("--scene"))?;
     if let Some(file) = o.get("--save-scene") {
         scene::save(&p.scene, Path::new(file))?;
-        eprintln!("star-photos-app: scene saved to {file}");
+        eprintln!("pictor: scene saved to {file}");
         return Ok(());
     }
     let mp = o.get("--mp").map(|v| v.parse()).transpose()?;
@@ -114,14 +114,14 @@ fn headless(
     Ok(())
 }
 
-fn run() -> Result<()> {
-    let (folder, o) = options()?;
+fn run(args: Vec<String>) -> Result<()> {
+    let (folder, o) = options(args)?;
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
     let adapter = adapter(&instance, o.get("--gpu"))?;
     let info = adapter.get_info();
     let gpu_name = format!("{} ({:?})", info.name, info.backend);
     let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-        label: Some("star-photos"),
+        label: Some("pictor"),
         required_limits: adapter.limits(),
         ..Default::default()
     }))?;
@@ -149,8 +149,7 @@ fn run() -> Result<()> {
         bench_seconds: o.get("--bench-window").map(|v| v.parse()).transpose()?,
         screenshot: o.get("--screenshot").map(PathBuf::from),
     };
-    let icon =
-        image::load_from_memory(include_bytes!("../assets/icon/star-photos.png"))?.into_rgba8();
+    let icon = image::load_from_memory(include_bytes!("../assets/icon/pictor.png"))?.into_rgba8();
     let icon = egui::IconData {
         width: icon.width(),
         height: icon.height(),
@@ -160,7 +159,7 @@ fn run() -> Result<()> {
         renderer: eframe::Renderer::Wgpu,
         wgpu_options,
         viewport: egui::ViewportBuilder::default()
-            .with_title("Star Photos")
+            .with_title("Pictor")
             .with_inner_size([1440.0, 900.0])
             .with_min_inner_size([1100.0, 700.0])
             .with_icon(std::sync::Arc::new(icon))
@@ -168,18 +167,30 @@ fn run() -> Result<()> {
         ..Default::default()
     };
     eframe::run_native(
-        "star-photos",
+        "pictor",
         options,
-        Box::new(move |cc| Ok(Box::new(app::StarPhotos::new(cc, start)) as Box<dyn eframe::App>)),
+        Box::new(move |cc| Ok(Box::new(app::Pictor::new(cc, start)) as Box<dyn eframe::App>)),
     )
     .map_err(|e| error(format!("window: {e}")))
 }
 
 fn main() -> std::process::ExitCode {
-    match run() {
+    let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+    let result = if command::wanted(&args) {
+        command::run(args)
+    } else {
+        args.into_iter()
+            .map(|a| {
+                a.into_string()
+                    .map_err(|a| error(format!("{} is not UTF-8", a.to_string_lossy())))
+            })
+            .collect::<Result<Vec<_>>>()
+            .and_then(run)
+    };
+    match result {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(e) => {
-            eprintln!("star-photos-app: {e}");
+            eprintln!("pictor: {e}");
             std::process::ExitCode::FAILURE
         }
     }

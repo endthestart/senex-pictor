@@ -3,7 +3,7 @@
 //! warm lit patch. Linear sRGB with sensor white at 1; deterministic.
 
 use crate::scene::{self, Scene};
-use star_photos::Result;
+use pictor_engine::Result;
 
 /// Stars per megapixel (60,000 over 24 MP).
 const STARS_PER_MP: f64 = 2500.0;

@@ -1,9 +1,9 @@
 //! Store stage commands: options parsed into each stage's call.
 
-use star_photos::budget::Budget;
-use star_photos::integrate::{self, cfa, hero, moment};
-use star_photos::store::{Store, planes};
-use star_photos::{Result, error, gpu::Gpu, register, render, review, separate};
+use crate::budget::Budget;
+use crate::integrate::{self, cfa, hero, moment};
+use crate::store::{Store, planes};
+use crate::{Result, error, gpu::Gpu, register, render, review, separate};
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::path::Path;
@@ -184,7 +184,7 @@ pub fn process(
     out: &Path,
     rest: &[OsString],
     budget: &Budget,
-) -> Result<star_photos::process::Report> {
+) -> Result<crate::process::Report> {
     let o = flags(
         rest,
         &[
@@ -198,9 +198,9 @@ pub fn process(
         .get("--run")
         .map(|v| v.parse().map_err(|e| error(format!("--run: {e}"))))
         .transpose()?;
-    let survey = star_photos::process::survey_for(raw, out, budget)?;
-    star_photos::process::process(
-        &star_photos::process::Options {
+    let survey = crate::process::survey_for(raw, out, budget)?;
+    crate::process::process(
+        &crate::process::Options {
             out,
             run,
             first: o.get("--first").map(String::as_str),

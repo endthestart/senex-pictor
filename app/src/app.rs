@@ -34,7 +34,7 @@ pub struct Start {
     pub screenshot: Option<PathBuf>,
 }
 
-pub struct StarPhotos {
+pub struct Pictor {
     pub(crate) workspace: Workspace,
     pub(crate) step: Step,
     /// The step to show once the next result opens.
@@ -50,9 +50,9 @@ pub struct StarPhotos {
     shot: Option<crate::shot::Shot>,
 }
 
-impl StarPhotos {
+impl Pictor {
     /// The app; without a wgpu renderer it opens on that error.
-    pub fn new(cc: &eframe::CreationContext<'_>, s: Start) -> StarPhotos {
+    pub fn new(cc: &eframe::CreationContext<'_>, s: Start) -> Pictor {
         crate::theme::apply(&cc.egui_ctx);
         let rs = cc.wgpu_render_state.as_ref();
         let display = match rs {
@@ -63,7 +63,7 @@ impl StarPhotos {
                 lines: vec!["the window did not start with wgpu".into()],
             },
         };
-        let memory = match star_photos::budget::Budget::from_free() {
+        let memory = match pictor_engine::budget::Budget::from_free() {
             Ok(b) => format!("Memory {} budget", crate::widgets::bytes(b.bytes as f64)),
             Err(_) => "Memory unknown".into(),
         };
@@ -73,7 +73,7 @@ impl StarPhotos {
             .next()
             .unwrap_or(&s.gpu_name)
             .to_string();
-        let mut app = StarPhotos {
+        let mut app = Pictor {
             workspace: Workspace::Empty,
             step: Step::Import,
             next: s.step.unwrap_or(Step::Compare),
@@ -167,7 +167,7 @@ impl StarPhotos {
     }
 }
 
-impl eframe::App for StarPhotos {
+impl eframe::App for Pictor {
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         self.poll(frame);
@@ -182,9 +182,9 @@ impl eframe::App for StarPhotos {
         let (name, chips) = rows::header(self);
         if name != self.title {
             let title = if name.is_empty() {
-                "Star Photos".to_string()
+                "Pictor".to_string()
             } else {
-                format!("{name} — Star Photos")
+                format!("{name} — Pictor")
             };
             ctx.send_viewport_cmd(egui::ViewportCommand::Title(title));
             self.title = name.clone();

@@ -94,7 +94,7 @@ Updated: 2026-10-27 (desktop app: all six steps; process resumes).
   test, so 86% of pixels look like sky and foliage smears into the stack. Transits must
   follow the sky model's motion, not only exceed the median. Haze or cloud late in the
   sequence (stars per frame down to 1,760 from a median of 11,767).
-- Phase 1 iteration 2 (full resolution from `star-photos develop`, private review page
+- Phase 1 iteration 2 (full resolution from `pictor develop`, private review page
   https://claude.ai/artifact/2JBHr3TKrsGhCCtzNrGE2B): camera-fixed glow separated from
   sky light per frame (glow changed 34 ADU over 100 min); treeline bands traced to tree
   pixels inside the resampling kernel (15–66× more dark rejections within 4 px) and fixed
@@ -136,7 +136,7 @@ Updated: 2026-10-27 (desktop app: all six steps; process resumes).
 Local commands:
 
 ```sh
-cargo fmt --package star-photos -- --check
+cargo fmt -p pictor-engine -p pictor -- --check
 cargo test --offline --locked
 cargo clippy --offline --locked --all-targets -- -D warnings
 cargo build --release --offline --locked

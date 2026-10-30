@@ -113,7 +113,7 @@ licence recorded in the reuse audit); sep, astroalign and SAM stay oracles until
   before ingesting (Northern Lights' full 1,039-frame run would need 218 GB) and takes
   `--first`/`--last` to process part of a run.
 
-Desktop app (M4, started 2026-10-27): research report (`reports/Star Photos app research.md`),
+Desktop app (M4, started 2026-10-27): research report (`reports/Star Photos app research.md`, written under the working name),
 six screen designs (private design canvas), toolkit decided in ADR 0011 from the canvas spike
 (45 MP on an M2 Max: under 1 ms of GPU per frame, 120 Hz in a window, 5 ms look recompute,
 EDR confirmed). The app crate (`app/`) has all six steps, runs `process` with progress,

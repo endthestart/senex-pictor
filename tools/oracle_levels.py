@@ -112,7 +112,7 @@ def main():
     rt, rs = camconst(files["rtengine/camconst.json"]), rawspeed(files["data/cameras.xml"])
     paths = sorted(p for s in args.sources for p in ([s] if s.is_file() else s.rglob("*"))
                    if p.suffix.lower() in RAW_SUFFIXES)
-    binary = ROOT / "target/release/star-photos"
+    binary = ROOT / "target/release/pictor"
     with ThreadPoolExecutor(4) as pool:
         decoded = list(pool.map(lambda p: decode(binary, p), paths))
     groups = defaultdict(list)
@@ -126,7 +126,7 @@ def main():
         whites = sorted({w for f in frames for w in f["white"]})
         maxima = [f["active_maximum"] for f in frames]
         rt_entry = rt.get((model or "").lower()) or rt.get(f"{make} {model}".lower())
-        # Star Photos decodes CFA data only, so sRAW modes and other bit depths do not apply.
+        # Pictor decodes CFA data only, so sRAW modes and other bit depths do not apply.
         rs_modes = [m | {"sensor": rawspeed_sensor(m["sensors"], iso)} for m in rs.get((make, model), [])
                     if m["mode"] is None or m["mode"].startswith(f"{bits}bit")]
         flags = []

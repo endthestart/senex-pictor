@@ -1,9 +1,9 @@
-use star_photos::Result;
-use star_photos::budget::Budget;
-use star_photos::flow::rotation::{self, Turn};
-use star_photos::integrate::ground::{self, Combine, Source};
-use star_photos::sky::Camera;
-use star_photos::store::{FrameInfo, Manifest, Store, file};
+use pictor_engine::Result;
+use pictor_engine::budget::Budget;
+use pictor_engine::flow::rotation::{self, Turn};
+use pictor_engine::integrate::ground::{self, Combine, Source};
+use pictor_engine::sky::Camera;
+use pictor_engine::store::{FrameInfo, Manifest, Store, file};
 
 const W: usize = 96;
 const H: usize = 64;
@@ -20,7 +20,7 @@ fn scene(edge: f64) -> Vec<f32> {
 }
 
 fn store(frames: &[Vec<f32>]) -> Result<Store> {
-    let dir = std::env::temp_dir().join(format!("star-photos-ground-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("pictor-ground-{}", std::process::id()));
     if dir.exists() {
         std::fs::remove_dir_all(&dir)?;
     }
@@ -78,7 +78,7 @@ fn shift(dx: f64) -> Result<Turn> {
         .map(|k| [5.0 + 4.0 * k as f64, 10.0 + 2.0 * k as f64])
         .collect();
     let to: Vec<[f64; 2]> = from.iter().map(|p| [p[0] + dx, p[1]]).collect();
-    rotation::fit(&CAMERA, &from, &to).ok_or_else(|| star_photos::error("no turn"))
+    rotation::fit(&CAMERA, &from, &to).ok_or_else(|| pictor_engine::error("no turn"))
 }
 
 /// Pixels of the middle row more than 10 % of the step away from either level.

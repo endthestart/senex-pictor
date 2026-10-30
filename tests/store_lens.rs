@@ -1,7 +1,7 @@
-use star_photos::Result;
-use star_photos::lens::{field, find, same_lens, vignetting_entries};
-use star_photos::store::file::{f16_bytes, f16_values, pack_bits, unpack_bits};
-use star_photos::store::seconds;
+use pictor_engine::Result;
+use pictor_engine::lens::{field, find, same_lens, vignetting_entries};
+use pictor_engine::store::file::{f16_bytes, f16_values, pack_bits, unpack_bits};
+use pictor_engine::store::seconds;
 use std::path::PathBuf;
 
 const LENSFUN: &str = r#"<lensdatabase version="1">
@@ -25,7 +25,7 @@ const LENSFUN: &str = r#"<lensdatabase version="1">
 </lensdatabase>"#;
 
 fn database(name: &str) -> Result<PathBuf> {
-    let dir = std::env::temp_dir().join(format!("star-photos-{name}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("pictor-{name}-{}", std::process::id()));
     std::fs::create_dir_all(&dir)?;
     std::fs::write(dir.join("slr-nikon.xml"), LENSFUN)?;
     Ok(dir)

@@ -1,4 +1,4 @@
-# Agent handoff: Star Photos
+# Agent handoff: Pictor
 
 Prepared 2026-10-25. Project root: `/Users/andermic/Development/star-photos`.
 This file is an entry point, not a replacement for the requirements or milestone gates.
@@ -70,7 +70,7 @@ no native stacker, GUI or GPU backend yet.
 | `tools/oracle_levels.py`, `docs/oracle-lock.json` | Compare decoded levels with pinned rawspeed/RawTherapee oracles |
 | `tools/star_motion.py` | Phase 1 research: star tracking and registration-model comparison (needs `.venv`) |
 | `src/sequence/`, `src/store/`, `src/lens.rs` | Rust port R1: sequence check, frame/CFA stores, lensfun flat fields (CLI `check`, `ingest`, `flat`) |
-| `tools/proto/` | Phase 1 prototype: `run_iteration1.py` (half res), `run_iteration2.py` (full res via `star-photos develop`: sky-coherent transits in `transits.py`, matte in `separation.py`, glow in `background.py`, per-frame occlusion in `occlusion.py`, tiled Lanczos stack; `--lens-from` reuses a lens profile), `run_iteration3.py` (CFA/Bayer-drizzle sky stack in `cfa.py`), `run_moment.py` (dynamic-sky moment composites), `run_hero.py` (one chosen frame with the stacked sky behind it, drift-proof via `drift.py`), `run_foreground.py` (moving-foreground variants), `run_check.py` (sequence check in `sequence.py`, run first); `vignetting.py` lensfun flat fields, `quality.py` metrics, `render.py` review rendering; SAM via `.venv-sam` |
+| `tools/proto/` | Phase 1 prototype: `run_iteration1.py` (half res), `run_iteration2.py` (full res via `pictor develop`: sky-coherent transits in `transits.py`, matte in `separation.py`, glow in `background.py`, per-frame occlusion in `occlusion.py`, tiled Lanczos stack; `--lens-from` reuses a lens profile), `run_iteration3.py` (CFA/Bayer-drizzle sky stack in `cfa.py`), `run_moment.py` (dynamic-sky moment composites), `run_hero.py` (one chosen frame with the stacked sky behind it, drift-proof via `drift.py`), `run_foreground.py` (moving-foreground variants), `run_check.py` (sequence check in `sequence.py`, run first); `vignetting.py` lensfun flat fields, `quality.py` metrics, `render.py` review rendering; SAM via `.venv-sam` |
 
 Product code is Rust. Python tools are development-only, not product dependencies.
 Old `app.py`, `stacker.py`, `templates/`, `requirements.txt`, and
@@ -124,7 +124,7 @@ If the decoder revision changes, update provenance consistently, including
 `DECODER_REVISION`, source-lock, audit, tests and validation evidence.
 
 **Never use `cargo fmt --all` here:** it also reformats local path dependencies.
-Use `cargo fmt --package star-photos`. Previously reformatted vendor files were
+Use `cargo fmt -p pictor-engine -p pictor`. Previously reformatted vendor files were
 restored and their original hashes verified. Do not casually edit vendor files or
 regenerate their hashes to conceal drift.
 
@@ -140,7 +140,7 @@ Last implementation checks passed: formatting, 23 Rust tests, Clippy with warnin
 denied, release build and integrity of all 166 vendor files; see [status](status.md).
 
 ```sh
-cargo fmt --package star-photos -- --check
+cargo fmt -p pictor-engine -p pictor -- --check
 cargo test --offline --locked
 cargo clippy --offline --locked --all-targets -- -D warnings
 cargo build --release --offline --locked

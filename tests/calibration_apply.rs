@@ -1,7 +1,7 @@
 mod support;
 
-use star_photos::Result;
-use star_photos::calibration::{
+use pictor_engine::Result;
+use pictor_engine::calibration::{
     Calibrated, FlatField, Master, Role, build_flat, build_master, calibrate,
 };
 use support::*;

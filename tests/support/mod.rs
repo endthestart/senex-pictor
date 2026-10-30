@@ -5,8 +5,8 @@ use lcc_raw::{
     BlackLevel, Cfa, ColorData, Metadata, OpcodeLists, Orientation, RawData, RawFormat, RawImage,
     Rect,
 };
-use star_photos::Result;
-use star_photos::calibration::{Estimator, Mosaic};
+use pictor_engine::Result;
+use pictor_engine::calibration::{Estimator, Mosaic};
 
 pub const W: usize = 64;
 pub const H: usize = 48;

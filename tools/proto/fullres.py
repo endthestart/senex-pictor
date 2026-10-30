@@ -1,4 +1,4 @@
-"""Full-resolution frames from the Star Photos `develop` command (AHD, camera RGB, negatives
+"""Full-resolution frames from the Pictor `develop` command (AHD, camera RGB, negatives
 kept), cached as float16 ADU above black; saturated RAW pixels as packed bits per frame."""
 import json
 import shutil
@@ -13,7 +13,7 @@ import tifffile
 from proto.frames import capture_times
 
 ROOT = Path(__file__).resolve().parents[2]
-BINARY = ROOT / "target/release/star-photos"
+BINARY = ROOT / "target/release/pictor"
 
 
 def _develop(job):
@@ -66,7 +66,7 @@ def load(paths, cache, workers=12):
             results = list(pool.map(_develop, [(i, p, cache, shape) for i, p in enumerate(paths)]))
         meta = {"names": names, "shape": list(shape), "times_s": capture_times(paths),
                 "scale_adu": [r["scale_adu"] for r in results], "wb": [r["wb"] for r in results],
-                "saturated_pixels": [r["saturated_pixels"] for r in results], "source": "star-photos develop (AHD)"}
+                "saturated_pixels": [r["saturated_pixels"] for r in results], "source": "pictor develop (AHD)"}
         manifest.write_text(json.dumps(meta))
     return load_existing(cache, names)
 

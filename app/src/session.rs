@@ -10,7 +10,7 @@ use crate::screens::scene::SceneStep;
 use crate::screens::sky::Sky;
 use crate::thumbs::Thumbs;
 use crate::viewer::Viewer;
-use star_photos::Result;
+use pictor_engine::Result;
 
 pub struct Session {
     pub name: String,

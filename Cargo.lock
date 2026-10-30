@@ -2483,6 +2483,44 @@ dependencies = [
 ]
 
 [[package]]
+name = "pictor"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "eframe",
+ "egui",
+ "egui_kittest",
+ "half",
+ "image",
+ "pictor-engine",
+ "pollster 1.0.1",
+ "rfd",
+ "serde",
+ "serde_json",
+ "wgpu",
+]
+
+[[package]]
+name = "pictor-engine"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "half",
+ "jpeg-encoder",
+ "lcc-meta",
+ "lcc-raw",
+ "pollster 1.0.1",
+ "quick-xml",
+ "rayon",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sysinfo",
+ "tiff",
+ "wgpu",
+]
+
+[[package]]
 name = "pin-project"
 version = "1.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3095,44 +3133,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9571ea910ebd84c86af4b3ed27f9dbdc6ad06f17c5f96146b2b671e2976744f"
 dependencies = [
  "bitflags 2.13.2",
-]
-
-[[package]]
-name = "star-photos"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "half",
- "jpeg-encoder",
- "lcc-meta",
- "lcc-raw",
- "pollster 1.0.1",
- "quick-xml",
- "rayon",
- "serde",
- "serde_json",
- "sha2",
- "sysinfo",
- "tiff",
- "wgpu",
-]
-
-[[package]]
-name = "star-photos-app"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "eframe",
- "egui",
- "egui_kittest",
- "half",
- "image",
- "pollster 1.0.1",
- "rfd",
- "serde",
- "serde_json",
- "star-photos",
- "wgpu",
 ]
 
 [[package]]

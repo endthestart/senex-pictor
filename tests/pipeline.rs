@@ -1,7 +1,7 @@
 use lcc_raw::{
     BlackLevel, ColorData, Metadata, OpcodeLists, Orientation, RawData, RawFormat, RawImage, Rect,
 };
-use star_photos::{Result, pipeline};
+use pictor_engine::{Result, pipeline};
 
 fn fixture() -> RawImage {
     RawImage {
@@ -63,11 +63,11 @@ fn invalid_sensor_levels_and_samples_are_rejected() {
 
 #[test]
 fn float_tiff_roundtrip_preserves_values_and_existing_output() -> Result<()> {
-    use star_photos::{input::Identity, output};
+    use pictor_engine::{input::Identity, output};
     use std::{fs::File, io::BufReader};
     use tiff::decoder::{Decoder, DecodingResult};
     let (image, report) = pipeline::develop(&fixture())?;
-    let parent = std::env::temp_dir().join(format!("star-photos-test-{}", std::process::id()));
+    let parent = std::env::temp_dir().join(format!("pictor-test-{}", std::process::id()));
     std::fs::create_dir(&parent)?;
     let dir = parent.join("output");
     let source = Identity {
@@ -81,7 +81,7 @@ fn float_tiff_roundtrip_preserves_values_and_existing_output() -> Result<()> {
         let mut decoder = Decoder::new(BufReader::new(File::open(dir.join("camera-linear.tif"))?))?;
         assert_eq!(decoder.dimensions()?, (6, 4));
         let DecodingResult::F32(samples) = decoder.read_image()? else {
-            return Err(star_photos::error("TIFF did not preserve float samples"));
+            return Err(pictor_engine::error("TIFF did not preserve float samples"));
         };
         assert_eq!(samples, image.data.as_flattened());
         assert!(output::save(&dir, &image, &source, &report).is_err());
@@ -95,7 +95,8 @@ fn float_tiff_roundtrip_preserves_values_and_existing_output() -> Result<()> {
 #[test]
 fn bayer_demosaic_preserves_constant_channel_values() -> Result<()> {
     let mut raw = fixture();
-    let cfa = lcc_raw::Cfa::bayer("RGGB").ok_or_else(|| star_photos::error("invalid test CFA"))?;
+    let cfa =
+        lcc_raw::Cfa::bayer("RGGB").ok_or_else(|| pictor_engine::error("invalid test CFA"))?;
     raw.cpp = 1;
     raw.data = RawData::F32(
         (0..48)
