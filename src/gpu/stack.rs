@@ -204,9 +204,10 @@ pub fn stack(gpu: &Gpu, inputs: &Inputs, budget: &Budget) -> Result<SkyStack> {
     };
     let mut pending: Option<(super::Pending, usize)> = None;
     // Each band's rows are held twice (as read and packed for upload) beside two bands'
-    // results in flight.
+    // results in flight; one band's frame rows must also fit the GPU's largest buffer.
     let per_row = (2 * w * 3 * OUTPUTS * 4) as u64;
-    let bands = bands(inputs, &rotations, BAND, per_row / 2, room / 2)?;
+    let room = (room / 2).min(gpu.max_buffer());
+    let bands = bands(inputs, &rotations, BAND, per_row / 2, room)?;
     budget
         .progress
         .step("Stacking the sky on the GPU", bands.len());

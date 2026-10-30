@@ -111,6 +111,11 @@ impl Gpu {
         Ok(value)
     }
 
+    /// The largest buffer the device binds.
+    pub fn max_buffer(&self) -> u64 {
+        self.max_buffer
+    }
+
     pub fn storage(&self, label: &str, bytes: &[u8]) -> Result<wgpu::Buffer> {
         if bytes.len() as u64 > self.max_buffer {
             return Err(error(format!(
