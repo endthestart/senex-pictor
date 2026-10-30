@@ -179,7 +179,7 @@ impl Import {
         self.out = if empty || ours {
             dir
         } else {
-            let name = super::default_out(&self.raw)
+            let name = super::default_out(&self.raw, &self.settings)
                 .ok()
                 .and_then(|p| p.file_name().map(|n| n.to_os_string()))
                 .unwrap_or_else(|| "Pictor".into());

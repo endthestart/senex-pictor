@@ -313,3 +313,23 @@ fn a_painted_correction_is_applied_and_the_run_reopens_on_sky() -> Result<()> {
     save(&h.render().map_err(error)?, "sky-corrected.jpg")?;
     Ok(())
 }
+
+/// ⌘, opens Settings over the first screen and Cancel closes it without saving.
+#[test]
+fn settings_open_with_command_comma_and_cancel_closes_them() -> Result<()> {
+    let mut h = harness(None, None);
+    h.step();
+    h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Comma);
+    h.step();
+    h.step();
+    save(&h.render().map_err(error)?, "settings.jpg")?;
+    assert!(h.query_by_label("Save").is_some(), "Settings should open");
+    h.get_by_label("Cancel").click();
+    h.step();
+    h.step();
+    assert!(
+        h.query_by_label("Save").is_none(),
+        "Cancel should close Settings"
+    );
+    Ok(())
+}

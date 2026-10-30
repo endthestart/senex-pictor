@@ -8,6 +8,7 @@ use crate::import::Import;
 use crate::job::Job;
 use crate::project::{self, Loaded};
 use crate::session::Session;
+use crate::settings::Settings;
 use crate::shell::{self, Step};
 use crate::{rows, welcome};
 use std::path::PathBuf;
@@ -48,6 +49,19 @@ pub struct Pictor {
     pub(crate) error: Option<String>,
     pub(crate) bench: Option<crate::bench::Window>,
     shot: Option<crate::shot::Shot>,
+    pub(crate) settings: Settings,
+    settings_window: crate::settings::Window,
+}
+
+/// The header's memory chip for `settings`.
+fn memory_chip(settings: &Settings) -> String {
+    match settings.memory_gb {
+        Some(gb) => format!("Memory {gb:.0} GB set"),
+        None => match pictor_engine::budget::Budget::from_free() {
+            Ok(b) => format!("Memory {} budget", crate::widgets::bytes(b.bytes as f64)),
+            Err(_) => "Memory unknown".into(),
+        },
+    }
 }
 
 impl Pictor {
@@ -64,10 +78,17 @@ impl Pictor {
                 lines: vec!["the window did not start with wgpu".into()],
             },
         };
-        let memory = match pictor_engine::budget::Budget::from_free() {
-            Ok(b) => format!("Memory {} budget", crate::widgets::bytes(b.bytes as f64)),
-            Err(_) => "Memory unknown".into(),
+        let (settings, settings_error) = match Settings::load() {
+            Ok(s) => (s, None),
+            Err(e) => (
+                Settings::default(),
+                Some(format!(
+                    "Settings could not be read ({e}); using the defaults"
+                )),
+            ),
         };
+        settings.clone().put(&cc.egui_ctx);
+        let memory = memory_chip(&settings);
         let gpu = s
             .gpu_name
             .split(" (")
@@ -85,7 +106,10 @@ impl Pictor {
             error: None,
             shot: s.screenshot.map(crate::shot::Shot::new),
             bench: s.bench_seconds.map(crate::bench::Window::new),
+            settings,
+            settings_window: Default::default(),
         };
+        app.error = settings_error;
         if rs.is_none() {
             app.error = Some("the window did not start with wgpu".into());
         } else if let Some(path) = s.open {
@@ -203,9 +227,18 @@ impl eframe::App for Pictor {
             ctx.send_viewport_cmd(egui::ViewportCommand::Title(title));
             self.title = name.clone();
         }
-        egui::Panel::top("header")
+        let clicked = egui::Panel::top("header")
             .frame(egui::Frame::NONE)
-            .show(ui, |ui| shell::header(ui, &name, &chips));
+            .show(ui, |ui| shell::header(ui, &name, &chips))
+            .inner;
+        if clicked || ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::Comma)) {
+            self.settings_window.open(self.settings.clone());
+        }
+        if let Some(saved) = self.settings_window.show(&ctx) {
+            self.chips[0] = memory_chip(&saved);
+            self.settings = saved.clone();
+            saved.put(&ctx);
+        }
         let (icon, status) = rows::status(self);
         egui::Panel::bottom("status")
             .frame(egui::Frame::NONE)

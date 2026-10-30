@@ -5,10 +5,10 @@ use super::SceneStep;
 use crate::job::Job;
 use crate::project::Run;
 use crate::session::Session;
+use crate::settings::Settings;
 use crate::theme::{ACCENT, CARD, LINE, MUTED, WARN};
 use crate::widgets::{self, card, section};
 use egui::{Color32, CornerRadius, Rect, RichText, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
-use pictor_engine::budget::Budget;
 use pictor_engine::integrate::{cfa, hero, moment};
 use pictor_engine::store::Store;
 use pictor_engine::{process, render, review};
@@ -38,15 +38,9 @@ fn preview(store: &Store, out: &Path, name: &str) -> pictor_engine::Result<()> {
     Ok(())
 }
 
-fn budget(progress: pictor_engine::progress::Progress) -> pictor_engine::Result<Budget> {
-    let mut b = Budget::from_free()?;
-    b.progress = progress;
-    Ok(b)
-}
-
 impl Making {
     /// A hero composite around processed frame `frame`.
-    pub fn hero(run: &Run, frame: usize) -> Making {
+    pub fn hero(run: &Run, frame: usize, settings: Settings) -> Making {
         let name = run.store.manifest.frames[frame].name.clone();
         let (dir, out, lens) = (
             run.store.dir.clone(),
@@ -57,6 +51,7 @@ impl Making {
             label: format!("Making the hero composite around {name}"),
             job: Job::start("Making a hero composite", move |progress| {
                 let store = Store::open(&dir)?;
+                let gpu = settings.gpu()?;
                 let result = process::hero_name(&name);
                 let options = hero::Options {
                     hero: frame,
@@ -65,10 +60,10 @@ impl Making {
                     labels: None,
                     lens: lens.as_deref(),
                     kernel: cfa::KERNEL,
-                    gpu: None,
+                    gpu: gpu.as_ref(),
                     name: &result,
                 };
-                hero::hero(&store, &options, &budget(progress)?)?;
+                hero::hero(&store, &options, &settings.budget(progress)?)?;
                 preview(&store, &out, &result)?;
                 Ok(result)
             }),
@@ -76,14 +71,14 @@ impl Making {
     }
 
     /// A moment of the frames around processed frame `frame`.
-    pub fn moment(run: &Run, frame: usize) -> Making {
+    pub fn moment(run: &Run, frame: usize, settings: Settings) -> Making {
         let name = run.store.manifest.frames[frame].name.clone();
         let (dir, out) = (run.store.dir.clone(), run.out.clone());
         Making {
             label: format!("Making the moment at {name}"),
             job: Job::start("Making a moment", move |progress| {
                 let store = Store::open(&dir)?;
-                moment::moment(&store, frame, moment::HALF, &budget(progress)?)?;
+                moment::moment(&store, frame, moment::HALF, &settings.budget(progress)?)?;
                 let result = format!("moment-{}", name.split('.').next().unwrap_or(&name));
                 preview(&store, &out, &result)?;
                 Ok(result)

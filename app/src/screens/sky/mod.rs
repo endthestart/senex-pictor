@@ -10,13 +10,13 @@ use crate::import::job_card;
 use crate::job::Job;
 use crate::project::Run;
 use crate::session::Session;
+use crate::settings::Settings;
 use crate::shell::{State, Step, StepRow};
 use crate::theme::{MUTED, WARN};
 use crate::viewer::{Canvas, Viewer};
 use crate::widgets::{self, card, key, section, strong};
 use brush::{Brush, RADIUS_RANGE, Tool};
 use egui::{Color32, CornerRadius, RichText, Sense, Ui, vec2};
-use pictor_engine::budget::Budget;
 use pictor_engine::process;
 use pictor_engine::separate::corrections;
 use pictor_engine::store::Store;
@@ -52,7 +52,7 @@ impl Sky {
     }
 
     /// Saves the strokes to the store and does the run again from its matte on.
-    fn apply(&mut self, run: &Run) {
+    fn apply(&mut self, run: &Run, settings: Settings) {
         let (dir, out, strokes) = (
             run.store.dir.clone(),
             run.out.clone(),
@@ -62,9 +62,8 @@ impl Sky {
         self.error = None;
         self.applying = Some(Job::start("Applying the corrections", move |progress| {
             corrections::save(&Store::open(&dir)?, &strokes)?;
-            let mut budget = Budget::from_free()?;
-            budget.progress = progress;
-            process::correct(&out, None, &budget)
+            let gpu = settings.gpu()?;
+            process::correct(&out, gpu.as_ref(), &settings.budget(progress)?)
         }));
     }
 }
@@ -168,7 +167,7 @@ impl Sky {
                 .inner
                 .clicked()
             {
-                self.apply(run);
+                self.apply(run, Settings::get(ui.ctx()));
             }
             ui.label(widgets::muted(
                 "Applying draws the sky and ground again from the night's saved statistics, \

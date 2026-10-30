@@ -53,7 +53,10 @@ pub struct StepRow {
     pub detail: String,
 }
 
-pub fn header(ui: &mut Ui, name: &str, chips: &[String]) {
+/// The header: the app, what is open, the memory and GPU chips and Settings; whether Settings
+/// was clicked.
+pub fn header(ui: &mut Ui, name: &str, chips: &[String]) -> bool {
+    let mut settings = false;
     Frame::new()
         .fill(CHROME)
         .inner_margin(Margin::symmetric(20, 10))
@@ -66,6 +69,10 @@ pub fn header(ui: &mut Ui, name: &str, chips: &[String]) {
                     ui.label(RichText::new(name).color(MUTED));
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    settings = ui
+                        .add(egui::Button::new("Settings").frame(false))
+                        .on_hover_text("⌘,")
+                        .clicked();
                     for chip in chips.iter().rev() {
                         Frame::new()
                             .stroke(Stroke::new(1.0, LINE))
@@ -78,6 +85,7 @@ pub fn header(ui: &mut Ui, name: &str, chips: &[String]) {
                 });
             });
         });
+    settings
 }
 
 /// The step list; returns the step clicked.

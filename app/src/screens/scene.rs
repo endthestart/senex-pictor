@@ -140,6 +140,7 @@ pub fn show(ui: &mut Ui, s: &mut Session) {
     let chosen = s.scene.frame.and_then(|i| frames.get(i)).cloned();
     let list = treatments(s, run, chosen.as_deref());
     let ctx = ui.ctx().clone();
+    let settings = crate::settings::Settings::get(&ctx);
     let width = ((ui.available_width() - 24.0) / 3.0).max(240.0);
     let out = run.out.clone();
     let existing = run.results().unwrap_or_default();
@@ -221,10 +222,10 @@ pub fn show(ui: &mut Ui, s: &mut Session) {
                         {
                             match (t.title, s.scene.frame) {
                                 ("Hero frame", Some(i)) => {
-                                    s.scene.making = Some(Making::hero(run, i))
+                                    s.scene.making = Some(Making::hero(run, i, settings.clone()))
                                 }
                                 ("Short-window moment", Some(i)) => {
-                                    s.scene.making = Some(Making::moment(run, i))
+                                    s.scene.making = Some(Making::moment(run, i, settings.clone()))
                                 }
                                 _ => {}
                             }

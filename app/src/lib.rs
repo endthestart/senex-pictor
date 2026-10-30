@@ -14,6 +14,7 @@ mod rows;
 pub mod scene;
 mod screens;
 mod session;
+pub mod settings;
 pub mod shell;
 mod shot;
 mod stats;

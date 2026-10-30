@@ -1,6 +1,6 @@
 //! Lookups behind the checks that do not change while frames are chosen.
 
-use pictor_engine::budget::Budget;
+use crate::settings::Settings;
 use pictor_engine::{input, lens};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -56,10 +56,11 @@ impl Lookups {
             .clone()
     }
 
-    pub fn budget(&mut self) -> Result<(u64, usize), String> {
+    pub fn budget(&mut self, settings: &Settings) -> Result<(u64, usize), String> {
         self.budget
             .get_or_insert_with(|| {
-                Budget::from_free()
+                settings
+                    .budget(Default::default())
                     .map(|b| (b.bytes, b.threads))
                     .map_err(|e| e.to_string())
             })

@@ -14,8 +14,8 @@ pub use lookups::Lookups;
 pub use running::{job_card, stage_label};
 
 use crate::job::Job;
+use crate::settings::Settings;
 use crate::thumbs::Thumbs;
-use pictor_engine::budget::Budget;
 use pictor_engine::process::{self, Report};
 use pictor_engine::sequence::{Run, Survey};
 use pictor_engine::{Result, error, render};
@@ -41,19 +41,28 @@ pub struct Import {
     pub interrupted: Option<Report>,
     pub error: Option<String>,
     show_short_runs: bool,
+    /// The settings when the folder was opened: budget, GPU and output folder.
+    pub(super) settings: Settings,
 }
 
-/// Where a RAW folder's run goes unless another folder is chosen: `~/Pictures/Pictor/`
-/// and the folder's name (its parent's when it is called "raw"), numbered when taken.
-pub fn default_out(raw: &Path) -> Result<PathBuf> {
-    let home = std::env::var_os("HOME")
-        .ok_or_else(|| error("HOME is not set; choose an output folder"))?;
+/// Where a RAW folder's run goes unless another folder is chosen: the settings' output folder
+/// (`~/Pictures/Pictor/`) and the folder's name (its parent's when it is called "raw"),
+/// numbered when taken.
+pub fn default_out(raw: &Path, settings: &Settings) -> Result<PathBuf> {
     let named = |p: &Path| p.file_name().map(|n| n.to_string_lossy().into_owned());
     let mut name = named(raw).unwrap_or_else(|| "photos".into());
     if name.eq_ignore_ascii_case("raw") {
         name = raw.parent().and_then(named).unwrap_or(name);
     }
-    let base = PathBuf::from(home).join("Pictures").join("Pictor");
+    let base = match &settings.output {
+        Some(dir) => dir.clone(),
+        None => PathBuf::from(
+            std::env::var_os("HOME")
+                .ok_or_else(|| error("HOME is not set; choose an output folder"))?,
+        )
+        .join("Pictures")
+        .join("Pictor"),
+    };
     let mut out = base.join(&name);
     let mut k = 2;
     while out.exists() {
@@ -65,17 +74,15 @@ pub fn default_out(raw: &Path) -> Result<PathBuf> {
 
 impl Import {
     /// Checks `raw` in the background.
-    pub fn raw(raw: PathBuf) -> Import {
-        let (out, error) = match default_out(&raw) {
+    pub fn raw(raw: PathBuf, settings: Settings) -> Import {
+        let (out, error) = match default_out(&raw, &settings) {
             Ok(o) => (o, None),
             Err(e) => (raw.join("Pictor"), Some(e.to_string())),
         };
-        let folder = raw.clone();
+        let (folder, check) = (raw.clone(), settings.clone());
         Import {
             checking: Some(Job::start("Checking the folder", move |progress| {
-                let mut budget = Budget::from_free()?;
-                budget.progress = progress;
-                Survey::of(&folder, &budget)
+                Survey::of(&folder, &check.budget(progress)?)
             })),
             raw,
             survey: None,
@@ -91,11 +98,12 @@ impl Import {
             interrupted: None,
             error,
             show_short_runs: false,
+            settings,
         }
     }
 
     /// The run in `out` that stopped, ready to resume with its frames.
-    pub fn interrupted(out: PathBuf, report: Report) -> Result<Import> {
+    pub fn interrupted(out: PathBuf, report: Report, settings: Settings) -> Result<Import> {
         let survey = Survey::load(&out)?;
         let index = |name: &str| {
             survey
@@ -121,6 +129,7 @@ impl Import {
             interrupted: Some(report),
             error: None,
             show_short_runs: false,
+            settings,
         };
         import.surveyed(survey);
         Ok(import)
@@ -223,10 +232,11 @@ impl Import {
             return;
         };
         let (out, run, lens) = (self.out.clone(), self.run, self.lens.clone());
+        let settings = self.settings.clone();
         self.error = None;
         self.processing = Some(Job::start("Processing", move |progress| {
-            let mut budget = Budget::from_free()?;
-            budget.progress = progress;
+            let budget = settings.budget(progress)?;
+            let gpu = settings.gpu()?;
             process::process(
                 &process::Options {
                     out: &out,
@@ -236,7 +246,7 @@ impl Import {
                     hero: None,
                     lens: lens.as_deref(),
                     labels: None,
-                    gpu: None,
+                    gpu: gpu.as_ref(),
                     matrix: None,
                     look: render::NATURAL,
                     rematte: false,

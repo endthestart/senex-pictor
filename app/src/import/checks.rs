@@ -149,14 +149,19 @@ impl Checks {
                 });
             }
         }
-        let threads = match look.budget() {
+        let threads = match look.budget(&im.settings) {
             Ok((budget, threads)) => {
                 c.items.push(Check {
                     icon: Icon::Done,
                     title: "Memory",
                     lines: vec![line(format!(
-                        "{} budget (75% of free memory) on {threads} threads",
+                        "{} budget ({}) on {threads} threads",
                         bytes(budget as f64),
+                        if im.settings.memory_gb.is_some() {
+                            "set in Settings"
+                        } else {
+                            "75% of free memory"
+                        },
                     ))],
                 });
                 threads

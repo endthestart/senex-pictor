@@ -57,6 +57,16 @@ impl Budget {
         Budget::of(free as f64 * SHARE_OF_FREE / GB)
     }
 
+    /// The memory installed, in GB.
+    pub fn installed_gb() -> Result<f64> {
+        let mut system = sysinfo::System::new();
+        system.refresh_memory();
+        match system.total_memory() {
+            0 => Err(error("could not read the installed memory")),
+            total => Ok(total as f64 / GB),
+        }
+    }
+
     /// Memory held outside workers for frames of `pixels` pixels.
     pub fn held(pixels: usize) -> u64 {
         HELD_PER_PIXEL * pixels as u64

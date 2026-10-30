@@ -20,16 +20,19 @@ impl Pictor {
         self.error = None;
         match project::classify(&path) {
             Ok(Kind::Raw(raw)) => {
-                self.workspace = Workspace::Import(Box::new(Import::raw(raw)));
+                self.workspace =
+                    Workspace::Import(Box::new(Import::raw(raw, self.settings.clone())));
                 self.step = Step::Import;
             }
-            Ok(Kind::Interrupted(out, report)) => match Import::interrupted(out, *report) {
-                Ok(i) => {
-                    self.workspace = Workspace::Import(Box::new(i));
-                    self.step = Step::Import;
+            Ok(Kind::Interrupted(out, report)) => {
+                match Import::interrupted(out, *report, self.settings.clone()) {
+                    Ok(i) => {
+                        self.workspace = Workspace::Import(Box::new(i));
+                        self.step = Step::Import;
+                    }
+                    Err(e) => self.error = Some(e.to_string()),
                 }
-                Err(e) => self.error = Some(e.to_string()),
-            },
+            }
             Ok(Kind::Processed(out)) => self.load(Job::start("Opening the result", move |_| {
                 project::load_run(&out, None)
             })),
