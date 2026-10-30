@@ -81,15 +81,26 @@ pub fn f16_bytes(values: impl Iterator<Item = f32>) -> Vec<u8> {
     halves.iter().flat_map(|h| h.to_le_bytes()).collect()
 }
 
+/// Little-endian 16-bit floats as f32: read in place when the bytes are aligned on a
+/// little-endian machine, copied otherwise.
 pub fn f16_values(bytes: &[u8]) -> Vec<f32> {
-    let halves: Vec<f16> = bytes
-        .as_chunks::<2>()
-        .0
-        .iter()
-        .map(|b| f16::from_le_bytes(*b))
-        .collect();
-    let mut out = vec![0f32; halves.len()];
-    halves.convert_to_f32_slice(&mut out);
+    use half::slice::HalfBitsSliceExt;
+    let mut out = vec![0f32; bytes.len() / 2];
+    match bytemuck::try_cast_slice::<u8, u16>(bytes) {
+        Ok(bits) if cfg!(target_endian = "little") => {
+            bits.reinterpret_cast::<f16>()
+                .convert_to_f32_slice(&mut out);
+        }
+        _ => {
+            let halves: Vec<f16> = bytes
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|b| f16::from_le_bytes(*b))
+                .collect();
+            halves.convert_to_f32_slice(&mut out);
+        }
+    }
     out
 }
 

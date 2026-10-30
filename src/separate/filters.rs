@@ -1,7 +1,13 @@
 //! Full-resolution image operations with scipy.ndimage semantics (the prototype's oracle):
 //! box and median filters (reflected edges), binary morphology with the 3×3 cross (outside
 //! the image counts as background), exact Euclidean distance transform with nearest indices
-//! and 4-connected components.
+//! and 4-connected components. Each output pixel depends only on the input, so the filters
+//! run across all cores with the same result.
+
+use rayon::prelude::*;
+
+/// Columns per worker per round of the distance transform's column pass.
+const COLUMN_BLOCK: usize = 64;
 
 /// scipy's reflect mode: d c b a | a b c d | d c b a.
 fn reflect(i: isize, n: usize) -> usize {
@@ -23,6 +29,7 @@ pub fn uniform(image: &[f32], width: usize, height: usize, size: usize) -> Vec<f
     let r = (size / 2) as isize;
     let pass = |src: &[f64], along_x: bool| -> Vec<f64> {
         (0..width * height)
+            .into_par_iter()
             .map(|p| {
                 let (x, y) = ((p % width) as isize, (p / width) as isize);
                 (-r..=r)
@@ -48,24 +55,28 @@ pub fn uniform(image: &[f32], width: usize, height: usize, size: usize) -> Vec<f
 /// Median (rank size²/2) over a size×size box spanning −size/2 ..= size − 1 − size/2.
 pub fn median(image: &[f32], width: usize, height: usize, size: usize) -> Vec<f32> {
     let (lo, hi) = (-((size / 2) as isize), (size - 1 - size / 2) as isize);
-    let mut window = vec![0f32; size * size];
     (0..width * height)
-        .map(|p| {
-            let (x, y) = ((p % width) as isize, (p / width) as isize);
-            let mut k = 0;
-            for dy in lo..=hi {
-                for dx in lo..=hi {
-                    window[k] = image[reflect(y + dy, height) * width + reflect(x + dx, width)];
-                    k += 1;
+        .into_par_iter()
+        .map_init(
+            || vec![0f32; size * size],
+            |window, p| {
+                let (x, y) = ((p % width) as isize, (p / width) as isize);
+                let mut k = 0;
+                for dy in lo..=hi {
+                    for dx in lo..=hi {
+                        window[k] = image[reflect(y + dy, height) * width + reflect(x + dx, width)];
+                        k += 1;
+                    }
                 }
-            }
-            *window.select_nth_unstable_by(k / 2, f32::total_cmp).1
-        })
+                *window.select_nth_unstable_by(k / 2, f32::total_cmp).1
+            },
+        )
         .collect()
 }
 
 fn cross(mask: &[bool], width: usize, height: usize, grow: bool) -> Vec<bool> {
     (0..width * height)
+        .into_par_iter()
         .map(|p| {
             let (x, y) = (p % width, p / width);
             let near = [
@@ -156,31 +167,39 @@ pub fn distance_squared(
     }
     let mut dist = vec![f64::INFINITY; width * height];
     let mut index = vec![0usize; width * height];
-    let (mut col, mut from, mut out, mut at) = (
-        vec![0.0; height],
-        vec![0; height],
-        vec![0.0; height],
-        vec![0; height],
-    );
-    for x in 0..width {
-        for y in 0..height {
-            let p = y * width + x;
-            col[y] = if known[p] { 0.0 } else { f64::INFINITY };
-            from[y] = p;
-        }
+    let column = |x: usize| {
+        let col: Vec<f64> = (0..height)
+            .map(|y| {
+                if known[y * width + x] {
+                    0.0
+                } else {
+                    f64::INFINITY
+                }
+            })
+            .collect();
+        let from: Vec<usize> = (0..height).map(|y| y * width + x).collect();
+        let (mut out, mut at) = (vec![0.0; height], vec![0; height]);
         lower_envelope(&col, &from, &mut out, &mut at);
-        for y in 0..height {
-            dist[y * width + x] = out[y];
-            index[y * width + x] = at[y];
+        (out, at)
+    };
+    for x0 in (0..width).step_by(COLUMN_BLOCK * rayon::current_num_threads()) {
+        let x1 = (x0 + COLUMN_BLOCK * rayon::current_num_threads()).min(width);
+        let done: Vec<(Vec<f64>, Vec<usize>)> = (x0..x1).into_par_iter().map(column).collect();
+        for (x, (out, at)) in (x0..x1).zip(done) {
+            for y in 0..height {
+                dist[y * width + x] = out[y];
+                index[y * width + x] = at[y];
+            }
         }
     }
-    let (mut out, mut at) = (vec![0.0; width], vec![0; width]);
-    for y in 0..height {
-        let row = y * width..(y + 1) * width;
-        lower_envelope(&dist[row.clone()], &index[row.clone()], &mut out, &mut at);
-        dist[row.clone()].copy_from_slice(&out);
-        index[row].copy_from_slice(&at);
-    }
+    dist.par_chunks_mut(width)
+        .zip(index.par_chunks_mut(width))
+        .for_each(|(d, i)| {
+            let (mut out, mut at) = (vec![0.0; width], vec![0; width]);
+            lower_envelope(d, i, &mut out, &mut at);
+            d.copy_from_slice(&out);
+            i.copy_from_slice(&at);
+        });
     Some((dist, index))
 }
 
