@@ -117,9 +117,11 @@ Desktop app (M4, started 2026-10-27): research report (`reports/Star Photos app 
 six screen designs (private design canvas), toolkit decided in ADR 0011 from the canvas spike
 (45 MP on an M2 Max: under 1 ms of GPU per frame, 120 Hz in a window, 5 ms look recompute,
 EDR confirmed). The app crate (`app/`) has all six steps, runs `process` with progress,
-Cancel and Resume, and makes hero frames and moments; next is refining the look and feel in
-a live window with the owner, then mask corrections (brush, candidate masks), comparing two
-results side by side, and settings for the memory budget and GPU.
+Cancel and Resume, and makes hero frames and moments. Since 2026-10-29 it takes brush
+corrections of the matte, compares two results side by side, exports HDR JPEGs, has Settings
+(GPU, memory, output folder) and a macOS menu bar. Next is refining the look and feel in a live
+window with the owner, then candidate masks (regions the engine was unsure of, offered for
+review) and Linux and Windows build checks.
 
 Gate per milestone: prototype parity on Wild River, Maplewood, Northern Lights, BWCA and
 Yellowstone (registration angles within 1e-4°, matte agreement on 99.5% of pixels, stack

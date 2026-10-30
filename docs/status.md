@@ -1,6 +1,7 @@
 # Implementation status
 
-Updated: 2026-10-27 (desktop app: all six steps; process resumes).
+Updated: 2026-10-29 (renamed Pictor; star cores, colour fringes, lit foliage, matte corrections,
+HDR output, settings, menu bar, side-by-side results).
 
 ## Milestone gates
 
@@ -8,8 +9,11 @@ Updated: 2026-10-27 (desktop app: all six steps; process resumes).
 |---|---|---|
 | M0 Foundations | Partial; upstream refresh done | Vendored subset at Classic HEAD dbe90dc; source lock; corpus inventory. Registration/UI candidate audits pending. |
 | M1 RAW pipeline | Diagnostic slice plus calibration core | Camera-RGB export; calibration library with synthetic-truth tests; no end-to-end calibration, characterization or real calibration validation. |
-| M2 Registration/integration | Phase 1 iterations 1–2 done (Python; half, then full res) | Global sky model, algorithmic matte, glow separation, tiled Lanczos stack and maps on 262 Z6 II frames; no product implementation. |
-| M3–M7 | Planned | No stacking, desktop interface, GPU kernels or public release yet. |
+| M2 Registration/integration | Rust port R1–R7 done; lateral chromatic aberration measured from the stars | Fixed-axis and drift models, CFA stack (CPU and GPU) on the five owner sequences; PSF, photometry and colour gates not run. |
+| M3 Foreground/compositing | Partial | Matte from star transits, brightness and colour; owner corrections; long exposure, hero frame and moment composites. Lamp-lit swaying foliage looking straight up (Maplewood) still needs corrections. |
+| M4 Guided desktop app | In progress | Six steps, corrections, Settings, menu bar, side-by-side results, HDR preview and export; verified in headless renders only, not yet in a live window or by independent users. |
+| M5 Acceleration | Started | GPU sky stack (wgpu) with CPU fallback; no profiling-led work yet. |
+| M6–M7 | Planned | No automation work or public release yet. |
 
 ## Completed
 
@@ -23,6 +27,20 @@ Updated: 2026-10-27 (desktop app: all six steps; process resumes).
   provenance report. 18 synthetic-truth tests; deliberate faults caught. Not in the CLI.
 - Two-phase plan: Phase 1 core sky/foreground logic first, Phase 2 decoder and
   calibration hardening ([plan](plan.md)); installs logged in [install-log](install-log.md).
+- Renamed Pictor (SENEX Pictor), engine and app work (2026-10-29): MIT OR Apache-2.0 licence;
+  one `pictor` binary (window, or a tool given a command). Clipped star cores fill with sensor
+  white and the renderer clips white-balanced colour at the lowest sensor level and bounds the
+  saturation boost (no more cyan cores). Lateral chromatic aberration is measured from star
+  centroids on the raw colour sites at registration and corrected in the CPU and GPU stacks
+  (Wild River: stacked stars' red and blue offsets from green 0.69 px → under 0.03 px at the
+  edge). The matte makes part-sky pixels with no transit within the local transit gap ground,
+  and light of its own colour where no star crosses (lamp-lit leaves); Yellowstone's orange
+  canopy patches are gone, Maplewood's red-lit leaves only partly. Owner corrections (brush
+  strokes in `store/corrections.json`) re-run a finished run from its matte on saved statistics
+  (`process::correct`, `pictor correct`). HDR JPEGs (gain map with Ultra HDR and ISO 21496-1
+  metadata) decode to HDR in macOS ImageIO. App: Settings (GPU, memory, output folder), macOS
+  menu bar, Compare B from another result of the run, HDR preview. GPU stack bands now stay
+  within the device's buffer limit. Validated on all five owner sequences; UI by headless renders.
 - Desktop app, all six steps (2026-10-27): Import checks a RAW folder in the background
   (thumbnails made during the sequence check), chooses runs and frames, checks lens profile,
   colour matrix, memory and disk before writing, and runs `process` with live progress, time
