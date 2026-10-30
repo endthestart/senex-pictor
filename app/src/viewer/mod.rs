@@ -30,6 +30,8 @@ pub struct Viewer {
     pub recompute_ms: Option<f64>,
     /// Light kept above paper white for an HDR preview (1 shows SDR).
     pub top: f32,
+    /// Another result of the run that rendering B shows instead (its name and scene).
+    pub other: Option<(String, Scene)>,
 }
 
 impl Viewer {
@@ -65,7 +67,49 @@ impl Viewer {
             centre: [size[0] as f32 / 2.0, size[1] as f32 / 2.0],
             recompute_ms: None,
             top: 1.0,
+            other: None,
         })
+    }
+
+    /// The scene rendering `k` shows.
+    fn scene_of(&self, k: usize) -> &Scene {
+        match (&self.other, k) {
+            (Some((_, scene)), 1) => scene,
+            _ => &self.scene,
+        }
+    }
+
+    /// What rendering `k` shows: its look, and the other result when B shows one.
+    pub fn key(&self, k: usize) -> String {
+        match (&self.other, k) {
+            (Some((name, _)), 1) => format!("{} · {name}", self.names[1]),
+            _ => self.names[k].clone(),
+        }
+    }
+
+    /// Rendering B from `other` (a result of the same run, its name and scene) in A's look, so
+    /// the two results are judged alike, or from the session's own result again.
+    pub fn show_in_b(&mut self, other: Option<(String, Scene)>) -> Result<()> {
+        if let Some((name, scene)) = &other
+            && (scene.width, scene.height) != (self.scene.width, self.scene.height)
+        {
+            return Err(pictor_engine::error(format!(
+                "{name} is {}×{}, not the {}×{} of this result",
+                scene.width, scene.height, self.scene.width, self.scene.height
+            )));
+        }
+        if other.is_some() {
+            self.look[1] = self.look[0];
+            self.names[1] = self.names[0].clone();
+        }
+        self.other = other;
+        let scene = match &self.other {
+            Some((_, scene)) => scene,
+            None => &self.scene,
+        };
+        self.looks.set_scene(&self.device, &self.queue, 1, scene);
+        self.params[1] = scene::params(scene, &self.look[1])?;
+        self.apply(1)
     }
 
     /// Scene pixel `p` in rendering pixels.
@@ -93,7 +137,7 @@ impl Viewer {
             || old.white_percentile != look.white_percentile
             || old.remove_glow != look.remove_glow;
         self.params[k] = if relevel {
-            scene::params(&self.scene, &look)?
+            scene::params(self.scene_of(k), &look)?
         } else {
             LookParams {
                 saturation: look.saturation,

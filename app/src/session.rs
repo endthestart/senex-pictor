@@ -36,8 +36,7 @@ impl Session {
         mp: Option<f64>,
     ) -> Result<Session> {
         let viewer = Viewer::new(rs, display, loaded.scene, mp)?;
-        let dir = loaded.run.as_ref().map(|r| r.out.clone());
-        let compare = Compare::new(&viewer, dir)?;
+        let compare = Compare::new(&viewer, loaded.run.as_ref(), loaded.result.as_deref())?;
         let thumbs = loaded.run.as_ref().map(|r| {
             let frames = &r.store.manifest.frames;
             let middle = frames.get(frames.len() / 2).map(|f| f.name.as_str());
@@ -89,6 +88,7 @@ impl Session {
     pub fn busy(&self) -> bool {
         self.scene.making.is_some()
             || self.sky.applying.is_some()
+            || self.compare.loading()
             || self.scene.loading()
             || self.look.exporting()
             || self.frames.loading()
@@ -96,7 +96,7 @@ impl Session {
 
     pub fn compare_detail(&self) -> String {
         match self.compare.judged() {
-            0 => format!("{} vs {}", self.viewer.names[0], self.viewer.names[1]),
+            0 => format!("{} vs {}", self.viewer.key(0), self.viewer.key(1)),
             n => format!("{n} regions judged"),
         }
     }

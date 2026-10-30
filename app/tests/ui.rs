@@ -334,3 +334,46 @@ fn settings_open_with_command_comma_and_cancel_closes_them() -> Result<()> {
     );
     Ok(())
 }
+
+/// Compare puts another result of the run in B (`PICTOR_UI_FOLDER` with a second result, such
+/// as the hero frame the Scene test makes; skipped without one).
+#[test]
+fn compare_shows_another_result_of_the_run_in_b() -> Result<()> {
+    let Ok(folder) = std::env::var("PICTOR_UI_FOLDER") else {
+        eprintln!("PICTOR_UI_FOLDER is not set; skipped");
+        return Ok(());
+    };
+    let store = PathBuf::from(&folder).join("store");
+    let Some(other) = std::fs::read_dir(&store)?
+        .filter_map(|e| e.ok())
+        .filter_map(|e| {
+            e.file_name()
+                .to_string_lossy()
+                .strip_suffix(".planes")
+                .map(String::from)
+        })
+        .find(|n| n.starts_with("hero-") || n.starts_with("moment-"))
+    else {
+        eprintln!("{folder} has no second result; skipped");
+        return Ok(());
+    };
+    let mut h = harness(Some(PathBuf::from(folder)), None);
+    wait(&mut h, 300, Pictor::opened)?;
+    h.state_mut().show_step(Step::Compare);
+    wait(&mut h, 60, Pictor::idle)?;
+    h.get_by_label("B shows").click();
+    h.step();
+    h.get_by_label(&other).click();
+    h.step();
+    wait(&mut h, 300, |p| {
+        p.idle() && p.session().is_some_and(|s| s.viewer.other.is_some())
+    })?;
+    save(&h.render().map_err(error)?, "compare-other.jpg")?;
+    let key = h
+        .state()
+        .session()
+        .map(|s| s.viewer.key(1))
+        .unwrap_or_default();
+    assert!(key.ends_with(&other), "B should show {other}, not {key}");
+    Ok(())
+}

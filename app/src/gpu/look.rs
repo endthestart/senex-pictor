@@ -12,10 +12,56 @@ const WORKGROUP: u32 = 16;
 
 pub struct Looks {
     pipeline: wgpu::ComputePipeline,
+    layout: wgpu::BindGroupLayout,
+    sampler: wgpu::Sampler,
     groups: [wgpu::BindGroup; 2],
     uniforms: [wgpu::Buffer; 2],
     pub outputs: [wgpu::Texture; 2],
     mips: Mips,
+}
+
+/// Rendering `k`'s inputs: its look, the scene and its glow, and its output's top level.
+fn group(
+    device: &wgpu::Device,
+    (layout, sampler): (&wgpu::BindGroupLayout, &wgpu::Sampler),
+    uniform: &wgpu::Buffer,
+    (base, glow): (&wgpu::Texture, &wgpu::Texture),
+    output: &wgpu::Texture,
+) -> wgpu::BindGroup {
+    let top = output.create_view(&wgpu::TextureViewDescriptor {
+        mip_level_count: Some(1),
+        ..Default::default()
+    });
+    let (base, glow) = (
+        base.create_view(&Default::default()),
+        glow.create_view(&Default::default()),
+    );
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("look"),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: uniform.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(&base),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::TextureView(&glow),
+            },
+            wgpu::BindGroupEntry {
+                binding: 3,
+                resource: wgpu::BindingResource::Sampler(sampler),
+            },
+            wgpu::BindGroupEntry {
+                binding: 4,
+                resource: wgpu::BindingResource::TextureView(&top),
+            },
+        ],
+    })
 }
 
 fn source(
@@ -120,49 +166,43 @@ impl Looks {
             })
         });
         let layout = pipeline.get_bind_group_layout(0);
-        let (base_view, glow_view) = (
-            base.create_view(&Default::default()),
-            glow.create_view(&Default::default()),
-        );
         let groups = std::array::from_fn(|k| {
-            let top = outputs[k].create_view(&wgpu::TextureViewDescriptor {
-                mip_level_count: Some(1),
-                ..Default::default()
-            });
-            device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("look"),
-                layout: &layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: uniforms[k].as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::TextureView(&base_view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: wgpu::BindingResource::TextureView(&glow_view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 3,
-                        resource: wgpu::BindingResource::Sampler(&sampler),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 4,
-                        resource: wgpu::BindingResource::TextureView(&top),
-                    },
-                ],
-            })
+            group(
+                device,
+                (&layout, &sampler),
+                &uniforms[k],
+                (&base, &glow),
+                &outputs[k],
+            )
         });
         Ok(Looks {
             pipeline,
+            layout,
+            sampler,
             groups,
             uniforms,
             outputs,
             mips: Mips::new(device, FORMAT),
         })
+    }
+
+    /// Rendering `k` from `scene` (of the same size) instead.
+    pub fn set_scene(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        k: usize,
+        scene: &Scene,
+    ) {
+        let base = source(device, queue, scene, &scene.base, "scene");
+        let glow = source(device, queue, scene, &scene.glow, "glow");
+        self.groups[k] = group(
+            device,
+            (&self.layout, &self.sampler),
+            &self.uniforms[k],
+            (&base, &glow),
+            &self.outputs[k],
+        );
     }
 
     /// Recomputes rendering `k` with `params` and its mip levels; returns the seconds the GPU

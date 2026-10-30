@@ -54,7 +54,7 @@ fn tag(painter: &egui::Painter, pos: egui::Pos2, align: Align2, text: String) {
 
 impl Viewer {
     fn label(&self, k: usize) -> String {
-        format!("{} · {}", ["A", "B"][k], self.names[k])
+        format!("{} · {}", ["A", "B"][k], self.key(k))
     }
 
     /// The canvas over the whole of `ui`'s area: drag to pan, scroll to zoom, drag the split

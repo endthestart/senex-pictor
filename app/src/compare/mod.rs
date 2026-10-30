@@ -1,12 +1,14 @@
-//! The Compare step (design board 5), the hub every step returns to: two renderings of the
-//! same result, both on the GPU. Space swaps them in place with nothing in between; S splits
+//! The Compare step (design board 5), the hub every step returns to: two renderings, of the
+//! same result or of two results of the run, both on the GPU. Space swaps them in place with nothing in between; S splits
 //! the view with a draggable line; the side panel picks each side's look and shows regions
 //! chosen from the scene as 200% crops of both, each with an A / same / B verdict saved in the
 //! project folder.
 
 mod regions;
+mod source;
 mod verdict;
 
+use crate::project::Run;
 use crate::theme::MUTED;
 use crate::viewer::{Canvas, Viewer, Zoom};
 use crate::widgets::{self, card, section, strong};
@@ -31,12 +33,14 @@ pub struct Compare {
     regions: Vec<Region>,
     verdicts: Verdicts,
     dir: Option<PathBuf>,
+    source: source::Source,
     pub error: Option<String>,
 }
 
 impl Compare {
-    pub fn new(viewer: &Viewer, dir: Option<PathBuf>) -> Result<Compare> {
-        let verdicts = Verdicts::load(dir.as_deref(), &viewer.names[0], &viewer.names[1])?;
+    pub fn new(viewer: &Viewer, run: Option<&Run>, own: Option<&str>) -> Result<Compare> {
+        let dir = run.map(|r| r.out.clone());
+        let verdicts = Verdicts::load(dir.as_deref(), &viewer.key(0), &viewer.key(1))?;
         Ok(Compare {
             canvas: Canvas {
                 tags: true,
@@ -45,6 +49,7 @@ impl Compare {
             regions: regions::choose(&viewer.scene),
             verdicts,
             dir,
+            source: source::Source::new(run, own),
             error: None,
         })
     }
@@ -99,10 +104,7 @@ impl Compare {
                 if let Err(e) = viewer.set_named(k, name, look) {
                     self.error = Some(e.to_string());
                 }
-                match Verdicts::load(self.dir.as_deref(), &viewer.names[0], &viewer.names[1]) {
-                    Ok(v) => self.verdicts = v,
-                    Err(e) => self.error = Some(e.to_string()),
-                }
+                self.reload_verdicts(viewer);
             }
             if selected.is_none() {
                 ui.label(RichText::new(&viewer.names[k]).color(MUTED));
@@ -116,6 +118,12 @@ impl Compare {
             section(ui, "Renderings");
             self.side(ui, viewer, 0);
             self.side(ui, viewer, 1);
+            if let Some(other) = self.source.row(ui, viewer) {
+                if let Err(e) = viewer.show_in_b(other) {
+                    self.error = Some(e.to_string());
+                }
+                self.reload_verdicts(viewer);
+            }
             ui.add_space(4.0);
             widgets::key_hints(
                 ui,
@@ -187,6 +195,19 @@ impl Compare {
                 self.error = Some(e.to_string());
             }
         });
+    }
+
+    /// The verdicts kept for the pair now shown.
+    fn reload_verdicts(&mut self, viewer: &Viewer) {
+        match Verdicts::load(self.dir.as_deref(), &viewer.key(0), &viewer.key(1)) {
+            Ok(v) => self.verdicts = v,
+            Err(e) => self.error = Some(e.to_string()),
+        }
+    }
+
+    /// Whether another result is being read for B.
+    pub fn loading(&self) -> bool {
+        self.source.loading()
     }
 
     /// Regions judged so far.
