@@ -28,9 +28,14 @@ impl Mosaic {
             .ok_or_else(|| error("calibration requires a CFA pattern"))?
             .shifted(raw.active_area.x, raw.active_area.y);
         let a = raw.active_area;
-        let data = (a.y..a.y + a.height)
-            .flat_map(|y| (a.x..a.x + a.width).map(move |x| raw.data.get(y * raw.width + x)))
-            .collect();
+        let mut data = Vec::with_capacity(a.width * a.height);
+        for y in a.y..a.y + a.height {
+            let row = y * raw.width + a.x..y * raw.width + a.x + a.width;
+            match &raw.data {
+                lcc_raw::RawData::U16(v) => data.extend(v[row].iter().map(|&s| f32::from(s))),
+                lcc_raw::RawData::F32(v) => data.extend_from_slice(&v[row]),
+            }
+        }
         let mosaic = Mosaic {
             width: a.width,
             height: a.height,

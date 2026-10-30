@@ -89,6 +89,38 @@ pub fn develop(raw: &RawImage) -> Result<(Rgb32f, Development)> {
 }
 
 /// Rejects sensor data whose levels, samples or pending sensor-stage processing are unreviewed.
+/// Whether every active site's black (as `BlackLevel::at` sums it) is finite and below the white
+/// level, with the black of each column worked out once per row of the black pattern.
+fn blacks_below_white(raw: &RawImage) -> bool {
+    let (b, a, cpp) = (&raw.black, raw.active_area, raw.cpp);
+    let (r, c) = (b.repeat_rows.max(1), b.repeat_cols.max(1));
+    (0..cpp).all(|s| {
+        let white = raw.white_at(s);
+        let columns: Vec<Vec<f32>> = (0..r)
+            .map(|pr| {
+                (0..a.width)
+                    .map(|x| {
+                        let base = b
+                            .values
+                            .get((pr * c + x % c) * cpp + s)
+                            .or_else(|| b.values.first())
+                            .copied()
+                            .unwrap_or(0.0);
+                        base + b.delta_h.get(x).copied().unwrap_or(0.0)
+                    })
+                    .collect()
+            })
+            .collect();
+        (0..a.height).all(|y| {
+            let dv = b.delta_v.get(y).copied().unwrap_or(0.0);
+            columns[y % r].iter().all(|&column| {
+                let black = column + dv;
+                black.is_finite() && white > black
+            })
+        })
+    })
+}
+
 pub(crate) fn check_sensor(raw: &RawImage) -> Result<()> {
     raw.validate()?;
     if raw.pixel_aspect != 1.0 {
@@ -101,7 +133,9 @@ pub(crate) fn check_sensor(raw: &RawImage) -> Result<()> {
             "sensor-stage RAW opcodes require review before scientific processing",
         ));
     }
-    if (0..raw.data.len()).any(|i| !raw.data.get(i).is_finite()) {
+    if let lcc_raw::RawData::F32(samples) = &raw.data
+        && samples.iter().any(|v| !v.is_finite())
+    {
         return Err(error("sensor contains non-finite samples"));
     }
     if raw.white.is_empty() || raw.white.iter().any(|v| !v.is_finite() || *v <= 0.0) {
@@ -110,15 +144,8 @@ pub(crate) fn check_sensor(raw: &RawImage) -> Result<()> {
     if raw.black.values.is_empty() {
         return Err(error("missing sensor black levels"));
     }
-    for y in 0..raw.active_area.height {
-        for x in 0..raw.active_area.width {
-            for c in 0..raw.cpp {
-                let black = raw.black.at(x, y, c, raw.cpp);
-                if !black.is_finite() || raw.white_at(c) <= black {
-                    return Err(error("invalid black level or non-positive sensor range"));
-                }
-            }
-        }
+    if !blacks_below_white(raw) {
+        return Err(error("invalid black level or non-positive sensor range"));
     }
     Ok(())
 }

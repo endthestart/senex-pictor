@@ -3,6 +3,7 @@
 
 use crate::Result;
 use half::f16;
+use half::slice::HalfFloatSliceExt;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
@@ -71,19 +72,25 @@ pub fn sync(path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// `values` as little-endian 16-bit floats (rounded to nearest, ties to even; converted a
+/// slice at a time, with F16C where the CPU has it).
 pub fn f16_bytes(values: impl Iterator<Item = f32>) -> Vec<u8> {
-    values
-        .flat_map(|v| f16::from_f32(v).to_le_bytes())
-        .collect()
+    let values: Vec<f32> = values.collect();
+    let mut halves = vec![f16::ZERO; values.len()];
+    halves.convert_from_f32_slice(&values);
+    halves.iter().flat_map(|h| h.to_le_bytes()).collect()
 }
 
 pub fn f16_values(bytes: &[u8]) -> Vec<f32> {
-    bytes
+    let halves: Vec<f16> = bytes
         .as_chunks::<2>()
         .0
         .iter()
-        .map(|b| f16::from_le_bytes(*b).to_f32())
-        .collect()
+        .map(|b| f16::from_le_bytes(*b))
+        .collect();
+    let mut out = vec![0f32; halves.len()];
+    halves.convert_to_f32_slice(&mut out);
+    out
 }
 
 pub fn u16_bytes(values: impl Iterator<Item = u16>) -> Vec<u8> {
