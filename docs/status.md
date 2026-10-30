@@ -52,9 +52,9 @@ HDR output, settings, menu bar, side-by-side results).
   and `stats.planes` keep only what is read back, the feature image's median filter keeps a
   running histogram, each frame's tracking pyramid is built once, and macOS builds use
   mimalloc, which reuses freed pages rather than faulting them in again. BWCA, 36 files (13
-  frames kept): 154 s → about 72 s (the folder's sequence check 55 → 23 s, separation 25 →
-  17 s, stack 38 → 19 s, render 9 → 2.5 s). Peak memory rises (10.4 → 13.9 GB unconstrained),
-  but a run held to `--memory 8` peaks at 6.2 GB.
+  frames kept): 154 s → 65 s, measured with other work on the machine (the folder's sequence
+  check 55 → 25 s, separation 25 → 14 s, stack 38 → 14 s, render 9 → 2 s). Peak memory rises
+  (10.4 → 13.6 GB unconstrained), but a run held to `--memory 8` peaks at 6.2 GB.
 - Desktop app, all six steps (2026-10-27): Import checks a RAW folder in the background
   (thumbnails made during the sequence check), chooses runs and frames, checks lens profile,
   colour matrix, memory and disk before writing, and runs `process` with live progress, time
