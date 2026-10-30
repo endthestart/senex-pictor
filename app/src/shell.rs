@@ -2,7 +2,7 @@
 //! run uses, the step list on the left (each step with its state in a word or two, never
 //! locked), and a status line at the bottom.
 
-use crate::theme::{self, CHROME, LINE, MUTED, RAISED, TEXT, WARN};
+use crate::theme::{self, CHROME, LINE, MUTED, RAISED, TEXT, WARN, radius, role};
 use crate::widgets::{self, Icon, paint_icon};
 use egui::{CornerRadius, Frame, Margin, Rect, RichText, Sense, Stroke, Ui, vec2};
 
@@ -64,7 +64,7 @@ pub fn header(ui: &mut Ui, name: &str, chips: &[String]) -> bool {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
                 widgets::icon(ui, Icon::Star, 20.0);
-                ui.label(RichText::new("Pictor").font(theme::semibold(15.0)));
+                ui.label(RichText::new("Pictor").font(role::PANEL.font()));
                 if !name.is_empty() {
                     ui.label(RichText::new(name).color(MUTED));
                 }
@@ -76,7 +76,7 @@ pub fn header(ui: &mut Ui, name: &str, chips: &[String]) -> bool {
                     for chip in chips.iter().rev() {
                         Frame::new()
                             .stroke(Stroke::new(1.0, LINE))
-                            .corner_radius(CornerRadius::same(6))
+                            .corner_radius(CornerRadius::same(radius::CONTROL))
                             .inner_margin(Margin::symmetric(8, 3))
                             .show(ui, |ui| {
                                 ui.label(RichText::new(chip).monospace().size(12.0).color(MUTED))
@@ -99,9 +99,13 @@ pub fn rail(ui: &mut Ui, rows: &[StepRow], current: Step) -> Option<Step> {
         let usable = row.state != State::Unavailable;
         let p = ui.painter();
         if on {
-            p.rect_filled(rect, CornerRadius::same(8), RAISED);
+            p.rect_filled(rect, CornerRadius::same(radius::BUTTON), RAISED);
         } else if response.hovered() && usable {
-            p.rect_filled(rect, CornerRadius::same(8), RAISED.gamma_multiply(0.5));
+            p.rect_filled(
+                rect,
+                CornerRadius::same(radius::BUTTON),
+                RAISED.gamma_multiply(0.5),
+            );
         }
         let icon = match (on, row.state) {
             (true, _) => Icon::Current,

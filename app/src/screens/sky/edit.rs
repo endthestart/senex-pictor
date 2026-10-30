@@ -70,7 +70,7 @@ impl Sky {
                         self.brush.strokes.pop();
                     }
                     if ui
-                        .add_enabled(some, egui::Button::new("Clear all"))
+                        .add_enabled(some, egui::Button::new("Clear All"))
                         .clicked()
                     {
                         self.brush.strokes.clear();
@@ -83,7 +83,7 @@ impl Sky {
             }
             if ui
                 .add_enabled_ui(pending && !busy, |ui| {
-                    widgets::primary(ui, "Apply corrections")
+                    widgets::primary(ui, "Apply Corrections")
                 })
                 .inner
                 .clicked()

@@ -238,7 +238,7 @@ pub fn show(ui: &mut Ui, s: &mut Session) {
                             }
                         } else if !made
                             && s.scene.making.is_none()
-                            && widgets::primary(ui, "Make it").clicked()
+                            && widgets::primary(ui, "Make It").clicked()
                         {
                             match (t.title, s.scene.frame) {
                                 ("Hero frame", Some(i)) => {

@@ -5,10 +5,12 @@ mod controls;
 
 pub use controls::{choice, key, key_hints, legend, segmented, toggle};
 
-use crate::theme::{self, ACCENT, CARD, GOOD, GROUND, LINE, MUTED, RAISED, TEXT, WARN};
+use crate::theme::{
+    self, ACCENT, CARD, GOOD, GROUND, LINE, MUTED, RAISED, TEXT, WARN, radius, role,
+};
 use egui::text::LayoutJob;
 use egui::{
-    Color32, CornerRadius, FontId, Frame, Margin, Pos2, Rect, Response, RichText, Sense, Stroke,
+    Color32, CornerRadius, Frame, Margin, Pos2, Rect, Response, RichText, Sense, Stroke,
     TextFormat, Ui, Vec2, vec2,
 };
 
@@ -16,13 +18,32 @@ pub fn card<R>(ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> R {
     Frame::new()
         .fill(CARD)
         .stroke(Stroke::new(1.0, LINE))
-        .corner_radius(CornerRadius::same(12))
+        .corner_radius(CornerRadius::same(radius::CARD))
         .inner_margin(Margin::symmetric(18, 16))
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             add(ui)
         })
         .inner
+}
+
+/// A window over the app, styled as a card, that Esc or a click outside closes.
+pub fn dialog(id: &str) -> egui::Modal {
+    egui::Modal::new(egui::Id::new(id))
+        .frame(
+            Frame::new()
+                .fill(CARD)
+                .stroke(Stroke::new(1.0, LINE))
+                .corner_radius(CornerRadius::same(radius::CARD))
+                .inner_margin(Margin::same(24)),
+        )
+        .backdrop_color(Color32::from_black_alpha(160))
+}
+
+/// Buttons along a dialog's foot, the first added rightmost.
+pub fn dialog_buttons(ui: &mut Ui, add: impl FnOnce(&mut Ui)) {
+    let row = vec2(ui.available_width(), 38.0);
+    ui.allocate_ui_with_layout(row, egui::Layout::right_to_left(egui::Align::Center), add);
 }
 
 /// A small uppercase label over a card's contents.
@@ -32,7 +53,7 @@ pub fn section(ui: &mut Ui, text: &str) {
         &text.to_uppercase(),
         0.0,
         TextFormat {
-            font_id: FontId::proportional(12.0),
+            font_id: role::SECTION.font(),
             color: MUTED,
             extra_letter_spacing: 0.8,
             ..Default::default()
@@ -42,11 +63,11 @@ pub fn section(ui: &mut Ui, text: &str) {
 }
 
 pub fn heading(ui: &mut Ui, text: &str) {
-    ui.label(RichText::new(text).font(theme::semibold(24.0)));
+    ui.label(RichText::new(text).font(role::HEADING.font()));
 }
 
 pub fn strong(text: impl Into<String>) -> RichText {
-    RichText::new(text).font(theme::semibold(14.0))
+    RichText::new(text).font(role::STRONG.font())
 }
 
 pub fn muted(text: impl Into<String>) -> RichText {
@@ -61,13 +82,17 @@ pub fn mono(text: impl Into<String>) -> RichText {
 pub fn tile(ui: &mut Ui, label: &str, value: &str, color: Color32, width: f32) {
     Frame::new()
         .fill(theme::CHROME)
-        .corner_radius(CornerRadius::same(8))
+        .corner_radius(CornerRadius::same(radius::TILE))
         .inner_margin(Margin::symmetric(12, 10))
         .show(ui, |ui| {
             ui.set_width(width - 24.0);
             ui.vertical(|ui| {
                 ui.spacing_mut().item_spacing.y = 2.0;
-                ui.label(RichText::new(label).size(12.0).color(MUTED));
+                ui.label(
+                    RichText::new(label)
+                        .font(role::SECONDARY.font())
+                        .color(MUTED),
+                );
                 ui.label(
                     RichText::new(value)
                         .font(theme::semibold(18.0))
@@ -109,18 +134,18 @@ pub fn badge(ui: &mut Ui, text: &str, kind: Badge) -> Response {
         .corner_radius(CornerRadius::same(255))
         .inner_margin(Margin::symmetric(9, 2))
         .show(ui, |ui| {
-            ui.label(RichText::new(text).font(theme::semibold(11.5)).color(color))
+            ui.label(RichText::new(text).font(role::BADGE.font()).color(color))
         })
         .response
 }
 
 fn button(ui: &mut Ui, text: &str, fill: Color32, color: Color32, stroke: Color32) -> Response {
-    let label = RichText::new(text).font(theme::semibold(14.0)).color(color);
+    let label = RichText::new(text).font(role::STRONG.font()).color(color);
     ui.add(
         egui::Button::new(label)
             .fill(fill)
             .stroke(Stroke::new(1.0, stroke))
-            .corner_radius(CornerRadius::same(8))
+            .corner_radius(CornerRadius::same(radius::BUTTON))
             .min_size(vec2(0.0, 38.0)),
     )
 }

@@ -27,6 +27,10 @@ HDR output, settings, menu bar, side-by-side results).
   provenance report. 18 synthetic-truth tests; deliberate faults caught. Not in the CLI.
 - Two-phase plan: Phase 1 core sky/foreground logic first, Phase 2 decoder and
   calibration hardening ([plan](plan.md)); installs logged in [install-log](install-log.md).
+- SENEX family design (2026-10-30), agreed with the Corvus session and approved by the owner:
+  theme follows [DESIGN-TOKENS](DESIGN-TOKENS.md) v1 (a test checks it), icon redrawn from
+  the shared template with the Painter's Easel, About "© 2026 Michael Anderson", Third-Party
+  Notices, saved window frame, bundle id `com.senexapps.pictor`.
 - Renamed Pictor (SENEX Pictor), engine and app work (2026-10-29): MIT OR Apache-2.0 licence;
   one `pictor` binary (window, or a tool given a command). Clipped star cores fill with sensor
   white and the renderer clips white-balanced colour at the lowest sensor level and bounds the

@@ -45,7 +45,10 @@ A / same / B verdicts saved to `compare.json`); **Look & export** tunes the look
 exports the linear 32-bit master, a 16-bit TIFF, a JPEG or an HDR JPEG, with an HDR
 preview on screens that show light above paper white. Drop a folder on the window or
 run `cargo run --release -p pictor -- [FOLDER] [--step NAME]`.
-`tools/package-macos.sh` builds `dist/Pictor.app` (universal, ad hoc signed) and a zip of it.
+`tools/package-macos.sh` builds `dist/Pictor.app` (universal, ad hoc signed) and a zip of it,
+after `tools/notices.sh` refreshes the Third-Party Notices with `cargo about`.
+`.venv/bin/python tools/icon.py app/assets/icon` redraws the icon from the template in
+[DESIGN-TOKENS](docs/DESIGN-TOKENS.md), the look shared with SENEX Corvus.
 `cargo test -p pictor` renders the window headlessly (`PICTOR_UI_SHOTS=DIR`
 saves the frames; `PICTOR_UI_FOLDER`, `PICTOR_UI_RAW` and `PICTOR_UI_STOPPED`
 point the screen tests at a processed folder, a RAW folder and a stopped run).

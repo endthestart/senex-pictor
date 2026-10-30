@@ -147,7 +147,7 @@ impl Import {
         card(ui, |ui| {
             section(ui, "Output folder");
             ui.label(mono(self.out.display().to_string()));
-            if widgets::secondary(ui, "Choose another…").clicked()
+            if widgets::secondary(ui, "Choose Another…").clicked()
                 && let Some(dir) = rfd::FileDialog::new().pick_folder()
             {
                 self.choose_out(dir);

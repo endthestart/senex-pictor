@@ -156,6 +156,7 @@ fn run(args: Vec<String>) -> Result<()> {
         screenshot: o.get("--screenshot").map(PathBuf::from),
         desktop: true,
     };
+    let fixed_window = start.bench_seconds.is_some() || start.screenshot.is_some();
     let icon = image::load_from_memory(include_bytes!("../assets/icon/pictor.png"))?.into_rgba8();
     let icon = egui::IconData {
         width: icon.width(),
@@ -171,10 +172,11 @@ fn run(args: Vec<String>) -> Result<()> {
             .with_min_inner_size([1100.0, 700.0])
             .with_icon(std::sync::Arc::new(icon))
             .with_drag_and_drop(true),
+        persist_window: !fixed_window,
         ..Default::default()
     };
     eframe::run_native(
-        "pictor",
+        "Pictor",
         options,
         Box::new(move |cc| Ok(Box::new(app::Pictor::new(cc, start)) as Box<dyn eframe::App>)),
     )

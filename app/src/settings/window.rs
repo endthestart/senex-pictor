@@ -1,10 +1,11 @@
 //! The Settings window (⌘, or the header's Settings): the GPU processing runs on, the memory
-//! runs may use and where new runs go; saved when the owner clicks Save.
+//! runs may use and where new runs go; saved with Save or Return. Third-Party Notices opens
+//! from here too, for systems without the macOS menu bar.
 
 use super::{GpuChoice, Settings};
-use crate::theme::{CARD, LINE, WARN};
+use crate::theme::WARN;
 use crate::widgets::{self, mono, muted, section};
-use egui::{Align, Color32, ComboBox, CornerRadius, Frame, Layout, Margin, RichText, Stroke, vec2};
+use egui::{ComboBox, Key, Modifiers, RichText};
 use pictor_engine::budget::{Budget, SHARE_OF_FREE};
 
 const WIDTH: f32 = 480.0;
@@ -18,6 +19,7 @@ pub struct Window {
     gpus: Vec<String>,
     installed_gb: Option<f64>,
     error: Option<String>,
+    notices: bool,
 }
 
 fn gpu_label(choice: &GpuChoice) -> String {
@@ -46,15 +48,7 @@ impl Window {
         let draft = self.draft.as_mut()?;
         let mut saved = None;
         let mut close = false;
-        let frame = Frame::new()
-            .fill(CARD)
-            .stroke(Stroke::new(1.0, LINE))
-            .corner_radius(CornerRadius::same(12))
-            .inner_margin(Margin::same(24));
-        let modal = egui::Modal::new(egui::Id::new("settings"))
-            .frame(frame)
-            .backdrop_color(Color32::from_black_alpha(160))
-            .show(ctx, |ui| {
+        let modal = widgets::dialog("settings").show(ctx, |ui| {
             ui.set_width(WIDTH);
             ui.spacing_mut().item_spacing.y = 8.0;
             widgets::heading(ui, "Settings");
@@ -127,9 +121,9 @@ impl Window {
                 ui.label(RichText::new(e).color(WARN));
             }
             ui.add_space(GROUP_GAP);
-            let row = vec2(ui.available_width(), 38.0);
-            ui.allocate_ui_with_layout(row, Layout::right_to_left(Align::Center), |ui| {
-                if widgets::primary(ui, "Save").clicked() {
+            widgets::dialog_buttons(ui, |ui| {
+                let enter = ui.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Enter));
+                if widgets::primary(ui, "Save").clicked() || enter {
                     match draft.save() {
                         Ok(()) => {
                             saved = Some(draft.clone());
@@ -141,6 +135,12 @@ impl Window {
                 if widgets::secondary(ui, "Cancel").clicked() {
                     close = true;
                 }
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    if ui.link("Third-Party Notices…").clicked() {
+                        self.notices = true;
+                        close = true;
+                    }
+                });
             });
         });
         if close || modal.should_close() {
@@ -148,5 +148,10 @@ impl Window {
             self.draft = None;
         }
         saved
+    }
+
+    /// Whether the owner asked for Third-Party Notices since the last call.
+    pub fn notices_wanted(&mut self) -> bool {
+        std::mem::take(&mut self.notices)
     }
 }

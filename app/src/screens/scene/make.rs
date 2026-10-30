@@ -6,7 +6,7 @@ use crate::job::Job;
 use crate::project::Run;
 use crate::session::Session;
 use crate::settings::Settings;
-use crate::theme::{ACCENT, CARD, LINE, MUTED, WARN};
+use crate::theme::{ACCENT, CARD, LINE, MUTED, WARN, radius};
 use crate::widgets::{self, card, section};
 use egui::{Color32, CornerRadius, Rect, RichText, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
 use pictor_engine::integrate::{cfa, hero, moment};
@@ -203,10 +203,10 @@ pub fn picker(ui: &mut Ui, s: &mut Session, frames: &[String], lit: &[String]) {
                 let (rect, response) = ui.allocate_exact_size(cell, Sense::click());
                 let on = s.scene.frame == Some(i);
                 let p = ui.painter();
-                p.rect_filled(rect, CornerRadius::same(8), CARD);
+                p.rect_filled(rect, CornerRadius::same(radius::TILE), CARD);
                 p.rect_stroke(
                     rect,
-                    CornerRadius::same(8),
+                    CornerRadius::same(radius::TILE),
                     Stroke::new(if on { 2.0 } else { 1.0 }, if on { ACCENT } else { LINE }),
                     StrokeKind::Inside,
                 );

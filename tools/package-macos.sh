@@ -1,7 +1,8 @@
 #!/bin/sh
 # Builds dist/Pictor.app (universal: Apple Silicon and Intel, ad hoc signed) and
 # dist/Pictor-macos.zip. Needs rustup's stable toolchain with the aarch64-apple-darwin and
-# x86_64-apple-darwin targets, and Xcode's command-line tools (lipo, codesign, ditto).
+# x86_64-apple-darwin targets, Xcode's command-line tools (lipo, codesign, ditto) and
+# cargo-about, which refreshes the Third-Party Notices first.
 set -eu
 
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -10,6 +11,7 @@ version=$(sed -n 's/^version = "\(.*\)"/\1/p' "$root/app/Cargo.toml" | head -1)
 targets="aarch64-apple-darwin x86_64-apple-darwin"
 
 cd "$root"
+./tools/notices.sh
 for t in $targets; do
     RUSTC="$toolchain/rustc" CARGO_TARGET_DIR=target/package \
         "$toolchain/cargo" build --release -q -p pictor --target "$t"
@@ -29,7 +31,7 @@ cat > "$app/Contents/Info.plist" <<EOF
 <dict>
   <key>CFBundleName</key><string>Pictor</string>
   <key>CFBundleDisplayName</key><string>Pictor</string>
-  <key>CFBundleIdentifier</key><string>com.senex.pictor</string>
+  <key>CFBundleIdentifier</key><string>com.senexapps.pictor</string>
   <key>CFBundleExecutable</key><string>pictor</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$version</string>
@@ -38,7 +40,7 @@ cat > "$app/Contents/Info.plist" <<EOF
   <key>LSApplicationCategoryType</key><string>public.app-category.photography</string>
   <key>LSMinimumSystemVersion</key><string>12.0</string>
   <key>NSHighResolutionCapable</key><true/>
-  <key>NSHumanReadableCopyright</key><string>SENEX Pictor · MIT OR Apache-2.0</string>
+  <key>NSHumanReadableCopyright</key><string>© 2026 Michael Anderson · MIT OR Apache-2.0</string>
 </dict>
 </plist>
 EOF

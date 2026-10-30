@@ -2,7 +2,7 @@
 //! legends and key hints.
 
 use super::strong;
-use crate::theme::{self, ACCENT, CARD, GROUND, LINE, MUTED, RAISED, TEXT};
+use crate::theme::{self, ACCENT, CARD, GROUND, LINE, MUTED, RAISED, TEXT, radius, role};
 use egui::text::LayoutJob;
 use egui::{
     Align, Color32, CornerRadius, FontId, Frame, Margin, Response, RichText, Sense, Stroke,
@@ -35,7 +35,7 @@ pub fn toggle(ui: &mut Ui, on: bool, text: &str, key: Option<&str>) -> Response 
         egui::Button::new(job)
             .fill(fill)
             .stroke(Stroke::new(1.0, stroke))
-            .corner_radius(CornerRadius::same(6)),
+            .corner_radius(CornerRadius::same(radius::CONTROL)),
     )
 }
 
@@ -45,7 +45,7 @@ pub fn segmented(ui: &mut Ui, options: &[&str], selected: Option<usize>) -> Opti
     Frame::new()
         .fill(theme::CHROME)
         .stroke(Stroke::new(1.0, LINE))
-        .corner_radius(CornerRadius::same(8))
+        .corner_radius(CornerRadius::same(radius::BUTTON))
         .inner_margin(Margin::same(3))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
@@ -63,7 +63,7 @@ pub fn segmented(ui: &mut Ui, options: &[&str], selected: Option<usize>) -> Opti
                     })
                     .fill(if on { ACCENT } else { Color32::TRANSPARENT })
                     .stroke(Stroke::NONE)
-                    .corner_radius(CornerRadius::same(6));
+                    .corner_radius(CornerRadius::same(radius::CONTROL));
                     if ui.add(button).clicked() {
                         clicked = Some(k);
                     }
@@ -77,7 +77,11 @@ pub fn segmented(ui: &mut Ui, options: &[&str], selected: Option<usize>) -> Opti
 pub fn legend(ui: &mut Ui, color: Color32, text: &str) {
     let (rect, _) = ui.allocate_exact_size(vec2(10.0, 10.0), Sense::hover());
     ui.painter().rect_filled(rect, CornerRadius::same(2), color);
-    ui.label(RichText::new(text).size(12.0).color(MUTED));
+    ui.label(
+        RichText::new(text)
+            .font(role::SECONDARY.font())
+            .color(MUTED),
+    );
 }
 
 /// A choice shown as a card: a title and a note, outlined in the accent when chosen.
@@ -88,7 +92,7 @@ pub fn choice(ui: &mut Ui, on: bool, title: &str, note: &str) -> Response {
             if on { 2.0 } else { 1.0 },
             if on { ACCENT } else { LINE },
         ))
-        .corner_radius(CornerRadius::same(10))
+        .corner_radius(CornerRadius::same(radius::CARD))
         .inner_margin(Margin::symmetric(12, 10));
     let response = frame
         .show(ui, |ui| {
@@ -125,9 +129,14 @@ pub fn key_hints(ui: &mut Ui, hints: &[(&str, &str)]) {
 pub fn key(ui: &mut Ui, name: &str) {
     Frame::new()
         .stroke(Stroke::new(1.0, theme::LINE_STRONG))
-        .corner_radius(CornerRadius::same(4))
+        .corner_radius(CornerRadius::same(radius::KEY))
         .inner_margin(Margin::symmetric(5, 0))
         .show(ui, |ui| {
-            ui.label(RichText::new(name).monospace().size(11.0).color(MUTED))
+            ui.label(
+                RichText::new(name)
+                    .monospace()
+                    .size(role::NOTE.size)
+                    .color(MUTED),
+            )
         });
 }

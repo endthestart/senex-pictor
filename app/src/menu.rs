@@ -1,5 +1,6 @@
-//! The macOS menu bar (muda over AppKit): Pictor (About, Settings…, Hide, Quit), File (Open
-//! Folder…, Close Window), View (Fit, 100%, 200%, Full Screen), Go (the six steps) and Window.
+//! The macOS menu bar (muda over AppKit): Pictor (About, Third-Party Notices…, Settings…, Hide,
+//! Quit), File (Open Folder…, Close Window), View (Fit, 100%, 200%, Full Screen), Go (the six
+//! steps) and Window (Minimize, Zoom, Bring All to Front).
 //! AppKit gives the menu bar only keys with ⌘ (or ⌃): those items take the key and the app sees
 //! the command instead; the plain keys shown (F, 1, 2) still go to the window, where egui runs
 //! them, so nothing happens twice. There is no Edit menu, so ⌘Z stays the brush's undo.
@@ -24,6 +25,7 @@ fn command(id: &str) -> Option<Command> {
     match id {
         "open" => Some(Command::Open),
         "settings" => Some(Command::Settings),
+        "notices" => Some(Command::Notices),
         "fit" => Some(Command::Fit),
         "zoom.1" => Some(Command::Zoom(1.0)),
         "zoom.2" => Some(Command::Zoom(2.0)),
@@ -42,7 +44,7 @@ impl NativeMenu {
         let about = AboutMetadata {
             name: Some("Pictor".into()),
             version: Some(env!("CARGO_PKG_VERSION").into()),
-            copyright: Some("SENEX Pictor · MIT OR Apache-2.0".into()),
+            copyright: Some("© 2026 Michael Anderson · MIT OR Apache-2.0".into()),
             ..Default::default()
         };
         let app = Submenu::with_items(
@@ -50,6 +52,7 @@ impl NativeMenu {
             true,
             &[
                 &PredefinedMenuItem::about(Some("About Pictor"), Some(about)),
+                &MenuItem::with_id("notices", "Third-Party Notices…", true, None),
                 &PredefinedMenuItem::separator(),
                 &item("settings", "Settings…", cmd, Code::Comma),
                 &PredefinedMenuItem::separator(),
@@ -105,6 +108,7 @@ impl NativeMenu {
             true,
             &[
                 &PredefinedMenuItem::minimize(None),
+                &PredefinedMenuItem::maximize(Some("Zoom")),
                 &PredefinedMenuItem::bring_all_to_front(None),
             ],
         )

@@ -1,0 +1,10 @@
+Pictor ships these components, each under its own licence; notices that the crates do not
+carry themselves follow at the end.
+{{#each licenses}}
+
+==============================================================================
+{{{name}}} ({{{id}}})
+Used by: {{#each used_by}}{{{crate.name}}} {{{crate.version}}}{{#unless @last}}, {{/unless}}{{/each}}
+
+{{{text}}}
+{{/each}}

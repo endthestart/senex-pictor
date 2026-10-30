@@ -2,7 +2,7 @@
 //! and the chosen run's counts of overexposed and lit frames, twilight and drift.
 
 use super::Import;
-use crate::theme::{LINE_STRONG, MUTED, RAISED, WARN};
+use crate::theme::{LINE_STRONG, MUTED, RAISED, WARN, radius};
 use crate::widgets::{self, Badge, card, section, strong};
 use egui::{CornerRadius, Frame, Margin, RichText, Stroke, Ui};
 
@@ -79,7 +79,7 @@ impl Import {
                             egui::Color32::TRANSPARENT
                         },
                     ))
-                    .corner_radius(CornerRadius::same(10))
+                    .corner_radius(CornerRadius::same(radius::CARD))
                     .inner_margin(Margin::symmetric(14, 10));
                 let response = frame
                     .show(ui, |ui| {

@@ -45,7 +45,7 @@ pub struct Pictor {
     pub(crate) next: Step,
     pub(crate) display: Display,
     /// What the window title names.
-    title: String,
+    pub(crate) title: String,
     /// The header's chips: the memory budget and the GPU.
     pub(crate) chips: Vec<String>,
     pub(crate) mp: Option<f64>,
@@ -54,6 +54,7 @@ pub struct Pictor {
     shot: Option<crate::shot::Shot>,
     pub(crate) settings: Settings,
     pub(crate) settings_window: crate::settings::Window,
+    pub(crate) notices: crate::notices::Notices,
     /// The window's context, where screens read the settings.
     pub(crate) ctx: egui::Context,
     #[cfg(target_os = "macos")]
@@ -61,7 +62,7 @@ pub struct Pictor {
 }
 
 /// The header's memory chip for `settings`.
-fn memory_chip(settings: &Settings) -> String {
+pub(crate) fn memory_chip(settings: &Settings) -> String {
     match settings.memory_gb {
         Some(gb) => format!("Memory {gb:.0} GB set"),
         None => match pictor_engine::budget::Budget::from_free() {
@@ -120,6 +121,7 @@ impl Pictor {
             bench: s.bench_seconds.map(crate::bench::Window::new),
             settings,
             settings_window: Default::default(),
+            notices: Default::default(),
             ctx: cc.egui_ctx.clone(),
             #[cfg(target_os = "macos")]
             menu: None,
@@ -228,6 +230,11 @@ impl Pictor {
 }
 
 impl eframe::App for Pictor {
+    /// Only the window's frame is kept between launches, not egui's own state.
+    fn persist_egui_memory(&self) -> bool {
+        false
+    }
+
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         self.poll(frame);
@@ -240,15 +247,7 @@ impl eframe::App for Pictor {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
         let (name, chips) = rows::header(self);
-        if name != self.title {
-            let title = if name.is_empty() {
-                "Pictor".to_string()
-            } else {
-                format!("{name} — Pictor")
-            };
-            ctx.send_viewport_cmd(egui::ViewportCommand::Title(title));
-            self.title = name.clone();
-        }
+        self.retitle(&ctx, &name);
         let clicked = egui::Panel::top("header")
             .frame(egui::Frame::NONE)
             .show(ui, |ui| shell::header(ui, &name, &chips))
@@ -258,11 +257,7 @@ impl eframe::App for Pictor {
         }
         let steps = rows::steps(self);
         self.commands(&ctx, &steps);
-        if let Some(saved) = self.settings_window.show(&ctx) {
-            self.chips[0] = memory_chip(&saved);
-            self.settings = saved.clone();
-            saved.put(&ctx);
-        }
+        self.dialogs(&ctx);
         let (icon, status) = rows::status(self);
         egui::Panel::bottom("status")
             .frame(egui::Frame::NONE)

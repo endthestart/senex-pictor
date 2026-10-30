@@ -11,6 +11,7 @@ mod import;
 mod job;
 #[cfg(target_os = "macos")]
 mod menu;
+mod notices;
 mod opening;
 pub mod project;
 mod rows;
@@ -22,7 +23,7 @@ pub mod shell;
 mod shot;
 mod stats;
 mod synthetic;
-mod theme;
+pub mod theme;
 mod thumbs;
 pub mod viewer;
 mod welcome;

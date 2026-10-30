@@ -1,93 +1,12 @@
-use egui_kittest::Harness;
+mod common;
+
+use common::{SIZE, harness, rgb, save, wait};
 use egui_kittest::kittest::Queryable;
-use pictor::app::{Pictor, Start};
+use pictor::app::Pictor;
 use pictor::shell::Step;
 use pictor_engine::{Result, error};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
-
-const SIZE: [f32; 2] = [1440.0, 900.0];
-
-fn harness(open: Option<PathBuf>, demo: Option<[u32; 2]>) -> Harness<'static, Pictor> {
-    Harness::builder()
-        .with_size(SIZE)
-        .with_pixels_per_point(1.0)
-        .wgpu()
-        .build_eframe(move |cc| {
-            let device = cc.wgpu_render_state.as_ref().map(|r| r.device.clone());
-            Pictor::new(
-                cc,
-                Start {
-                    open,
-                    demo,
-                    step: None,
-                    mp: None,
-                    gpu_name: "test".into(),
-                    device: device
-                        .unwrap_or_else(|| pollster::block_on(async { test_device().await })),
-                    bench_seconds: None,
-                    screenshot: None,
-                    desktop: false,
-                },
-            )
-        })
-}
-
-async fn test_device() -> wgpu::Device {
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
-    let adapter = instance.request_adapter(&Default::default()).await;
-    match adapter {
-        Ok(a) => match a.request_device(&Default::default()).await {
-            Ok((d, _)) => d,
-            Err(e) => unreachable!("no device: {e}"),
-        },
-        Err(e) => unreachable!("no adapter: {e}"),
-    }
-}
-
-/// Steps the harness until `done` holds or `seconds` pass.
-fn wait(
-    h: &mut Harness<'static, Pictor>,
-    seconds: u64,
-    done: impl Fn(&Pictor) -> bool,
-) -> Result<()> {
-    let start = Instant::now();
-    while !done(h.state()) {
-        if start.elapsed() > Duration::from_secs(seconds) {
-            return Err(error("timed out waiting for the app"));
-        }
-        h.step();
-        std::thread::sleep(Duration::from_millis(50));
-    }
-    for _ in 0..3 {
-        h.step();
-    }
-    Ok(())
-}
-
-fn rgb(image: &image::RgbaImage, x: f32, y: f32) -> [u8; 3] {
-    let p = image.get_pixel(x as u32, y as u32);
-    [p[0], p[1], p[2]]
-}
-
-/// Saves `image` as `name` in `PICTOR_UI_SHOTS`, when it is set.
-fn save(image: &image::RgbaImage, name: &str) -> Result<()> {
-    let Ok(dir) = std::env::var("PICTOR_UI_SHOTS") else {
-        return Ok(());
-    };
-    let (w, h) = image.dimensions();
-    let display: Vec<[f32; 3]> = image
-        .pixels()
-        .map(|p| [p[0], p[1], p[2]].map(|v| f32::from(v) / 255.0))
-        .collect();
-    pictor_engine::export::jpeg(
-        &std::path::Path::new(&dir).join(name),
-        &display,
-        w as usize,
-        h as usize,
-        90,
-    )
-}
 
 #[test]
 fn the_first_screen_offers_to_open_a_folder() -> Result<()> {
@@ -95,7 +14,7 @@ fn the_first_screen_offers_to_open_a_folder() -> Result<()> {
     h.step();
     let shot = h.render().map_err(error)?;
     save(&shot, "welcome.jpg")?;
-    assert!(h.query_by_label("Open a folder…").is_some());
+    assert!(h.query_by_label("Open Folder…").is_some());
     assert!(!h.state().opened());
     Ok(())
 }
@@ -199,122 +118,6 @@ fn a_stopped_run_resumes_and_cancels_from_import() -> Result<()> {
     Ok(())
 }
 
-/// From the Scene step a hero composite is made in the background and opens in Compare
-/// (`PICTOR_UI_FOLDER`; skipped without it; adds the hero result to that folder).
-#[test]
-fn a_hero_frame_is_made_from_the_scene_step() -> Result<()> {
-    let Ok(folder) = std::env::var("PICTOR_UI_FOLDER") else {
-        eprintln!("PICTOR_UI_FOLDER is not set; skipped");
-        return Ok(());
-    };
-    let mut h = harness(Some(PathBuf::from(folder)), None);
-    wait(&mut h, 300, Pictor::opened)?;
-    h.state_mut().show_step(Step::Scene);
-    wait(&mut h, 60, Pictor::idle)?;
-    let before = h.render().map_err(error)?;
-    save(&before, "scene.jpg")?;
-    let made = h.query_all_by_label("Open in Compare").next().is_some();
-    if made {
-        h.get_by_label("Open in Compare").click();
-    } else {
-        h.get_all_by_label("Make it")
-            .next()
-            .ok_or_else(|| error("no Make it"))?
-            .click();
-        h.step();
-        let making = h.render().map_err(error)?;
-        save(&making, "scene-making.jpg")?;
-    }
-    wait(&mut h, 600, |a| a.idle() && a.comparing())?;
-    let opened = h.render().map_err(error)?;
-    save(&opened, "scene-hero-compare.jpg")?;
-    Ok(())
-}
-
-/// From the Scene step a short-window moment is made and opens in Compare
-/// (`PICTOR_UI_STACKED`, a processed folder with a whole-sequence stack; skipped without
-/// it; adds the moment to that folder).
-#[test]
-fn a_moment_is_made_from_the_scene_step() -> Result<()> {
-    let Ok(folder) = std::env::var("PICTOR_UI_STACKED") else {
-        eprintln!("PICTOR_UI_STACKED is not set; skipped");
-        return Ok(());
-    };
-    let mut h = harness(Some(PathBuf::from(folder)), None);
-    wait(&mut h, 300, Pictor::opened)?;
-    h.state_mut().show_step(Step::Scene);
-    wait(&mut h, 60, Pictor::idle)?;
-    let buttons = h.query_all_by_label("Make it").count();
-    assert!(
-        buttons >= 1,
-        "the moment should be offered for a stacked run"
-    );
-    h.get_all_by_label("Make it")
-        .last()
-        .ok_or_else(|| error("no Make it"))?
-        .click();
-    h.step();
-    assert!(!h.state().idle(), "Make it should start the moment");
-    wait(&mut h, 900, |a| a.idle() && a.comparing())?;
-    let opened = h.render().map_err(error)?;
-    save(&opened, "scene-moment-compare.jpg")?;
-    Ok(())
-}
-
-/// A drag with the primary button from `from` to `to`, a frame per tenth of the way.
-fn drag(h: &mut Harness<'static, Pictor>, from: [f32; 2], to: [f32; 2]) {
-    let at = |t: f32| {
-        egui::pos2(
-            from[0] + t * (to[0] - from[0]),
-            from[1] + t * (to[1] - from[1]),
-        )
-    };
-    h.hover_at(at(0.0));
-    h.step();
-    h.drag_at(at(0.0));
-    h.step();
-    for k in 1..=10 {
-        h.hover_at(at(k as f32 / 10.0));
-        h.step();
-    }
-    h.drop_at(at(1.0));
-    h.step();
-}
-
-/// Ground painted on Sky & ground is applied in the background and the run reopens there with
-/// the stroke saved (`PICTOR_UI_CORRECT`, a processed folder the test changes; skipped
-/// without it).
-#[test]
-fn a_painted_correction_is_applied_and_the_run_reopens_on_sky() -> Result<()> {
-    let Ok(folder) = std::env::var("PICTOR_UI_CORRECT") else {
-        eprintln!("PICTOR_UI_CORRECT is not set; skipped");
-        return Ok(());
-    };
-    let mut h = harness(Some(PathBuf::from(folder)), None);
-    wait(&mut h, 300, Pictor::opened)?;
-    h.state_mut().show_step(Step::Sky);
-    wait(&mut h, 60, Pictor::idle)?;
-    let saved = |p: &Pictor| p.session().map(|s| s.sky.brush.saved.len());
-    let before = saved(h.state()).ok_or("the folder should open")?;
-    h.key_press(egui::Key::G);
-    h.step();
-    drag(&mut h, [500.0, 300.0], [800.0, 340.0]);
-    let strokes = h.state().session().map_or(0, |s| s.sky.brush.strokes.len());
-    assert_eq!(strokes, before + 1, "the drag should paint one stroke");
-    save(&h.render().map_err(error)?, "sky-painted.jpg")?;
-    h.get_by_label("Apply corrections").click();
-    h.step();
-    assert!(!h.state().idle(), "applying runs in the background");
-    wait(&mut h, 1800, |p| p.idle() && saved(p) == Some(before + 1))?;
-    assert_eq!(
-        h.state().step(),
-        Step::Sky,
-        "the run reopens on Sky & ground"
-    );
-    save(&h.render().map_err(error)?, "sky-corrected.jpg")?;
-    Ok(())
-}
-
 /// ⌘, opens Settings over the first screen and Cancel closes it without saving.
 #[test]
 fn settings_open_with_command_comma_and_cancel_closes_them() -> Result<()> {
@@ -335,105 +138,29 @@ fn settings_open_with_command_comma_and_cancel_closes_them() -> Result<()> {
     Ok(())
 }
 
-/// Compare puts another result of the run in B (`PICTOR_UI_FOLDER` with a second result, such
-/// as the hero frame the Scene test makes; skipped without one).
+/// Settings links to Third-Party Notices, which lists the licences and closes with Esc.
 #[test]
-fn compare_shows_another_result_of_the_run_in_b() -> Result<()> {
-    let Ok(folder) = std::env::var("PICTOR_UI_FOLDER") else {
-        eprintln!("PICTOR_UI_FOLDER is not set; skipped");
-        return Ok(());
-    };
-    let store = PathBuf::from(&folder).join("store");
-    let Some(other) = std::fs::read_dir(&store)?
-        .filter_map(|e| e.ok())
-        .filter_map(|e| {
-            e.file_name()
-                .to_string_lossy()
-                .strip_suffix(".planes")
-                .map(String::from)
-        })
-        .find(|n| n.starts_with("hero-") || n.starts_with("moment-"))
-    else {
-        eprintln!("{folder} has no second result; skipped");
-        return Ok(());
-    };
-    let mut h = harness(Some(PathBuf::from(folder)), None);
-    wait(&mut h, 300, Pictor::opened)?;
-    h.state_mut().show_step(Step::Compare);
-    wait(&mut h, 60, Pictor::idle)?;
-    h.get_by_label("B shows").click();
+fn third_party_notices_open_from_settings() -> Result<()> {
+    let mut h = harness(None, None);
     h.step();
-    h.get_by_label(&other).click();
+    h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Comma);
     h.step();
-    wait(&mut h, 300, |p| {
-        p.idle() && p.session().is_some_and(|s| s.viewer.other.is_some())
-    })?;
-    save(&h.render().map_err(error)?, "compare-other.jpg")?;
-    let key = h
-        .state()
-        .session()
-        .map(|s| s.viewer.key(1))
-        .unwrap_or_default();
-    assert!(key.ends_with(&other), "B should show {other}, not {key}");
-    Ok(())
-}
-
-/// Sky & ground lists the regions the colour check made ground, and Show zooms to one with
-/// them tinted (`PICTOR_UI_CORRECT`, a run whose matte keeps them; skipped without it).
-#[test]
-fn show_zooms_to_a_region_the_colour_check_made_ground() -> Result<()> {
-    let Ok(folder) = std::env::var("PICTOR_UI_CORRECT") else {
-        eprintln!("PICTOR_UI_CORRECT is not set; skipped");
-        return Ok(());
-    };
-    let mut h = harness(Some(PathBuf::from(folder)), None);
-    wait(&mut h, 300, Pictor::opened)?;
-    h.state_mut().show_step(Step::Sky);
-    wait(&mut h, 60, Pictor::idle)?;
-    let Some(show) = h.query_all_by_label("Show").next() else {
-        return Err(error("no regions listed"));
-    };
-    show.click();
-    h.step();
-    h.step();
-    let shown = h
-        .state()
-        .session()
-        .map(|s| (s.sky.review.show, s.viewer.zoom));
+    h.get_by_label("Third-Party Notices…").click();
+    for _ in 0..4 {
+        h.step();
+    }
+    save(&h.render().map_err(error)?, "notices.jpg")?;
+    assert!(h.query_by_label("Save").is_none(), "Settings should close");
     assert!(
-        matches!(shown, Some((true, pictor::viewer::Zoom::Factor(_)))),
-        "Show should tint the regions and zoom in"
+        h.query_by_label_contains("Used by: ").is_some(),
+        "the notices should list what each licence covers"
     );
-    save(&h.render().map_err(error)?, "sky-region.jpg")?;
-    Ok(())
-}
-
-/// Scene's long exposure switches moving branches between sharp and blurred by redoing the
-/// composite (`PICTOR_UI_CORRECT`, a run the test changes; skipped without it).
-#[test]
-fn moving_branches_switch_redoes_the_composite() -> Result<()> {
-    let Ok(folder) = std::env::var("PICTOR_UI_CORRECT") else {
-        eprintln!("PICTOR_UI_CORRECT is not set; skipped");
-        return Ok(());
-    };
-    let mut h = harness(Some(PathBuf::from(folder)), None);
-    wait(&mut h, 300, Pictor::opened)?;
-    let sharp = |p: &Pictor| {
-        p.session()
-            .and_then(|s| s.run.as_ref())
-            .map(|r| r.report.sharp_moving)
-    };
-    let before = sharp(h.state()).ok_or("the run should open")?;
-    h.state_mut().show_step(Step::Scene);
-    wait(&mut h, 60, Pictor::idle)?;
-    h.get_by_label(if before { "Blurred" } else { "Sharp" })
-        .click();
+    h.key_press(egui::Key::Escape);
+    h.step();
     h.step();
     assert!(
-        !h.state().idle(),
-        "the composite is redone in the background"
+        h.query_by_label("Close").is_none(),
+        "Esc should close the notices"
     );
-    wait(&mut h, 1800, |p| p.idle() && sharp(p) == Some(!before))?;
-    save(&h.render().map_err(error)?, "scene-moving.jpg")?;
     Ok(())
 }

@@ -2,7 +2,7 @@
 //! output folder to review) by button or by dropping it on the window, a scene file, or the
 //! demo scene.
 
-use crate::theme::{self, ACCENT, LINE_STRONG, MUTED, WARN};
+use crate::theme::{self, ACCENT, LINE_STRONG, MUTED, WARN, radius, role};
 use crate::widgets::{self, Icon};
 use egui::{CornerRadius, Frame, Margin, RichText, Stroke, Ui};
 use std::path::PathBuf;
@@ -32,7 +32,7 @@ pub fn show(ui: &mut Ui, error: Option<&str>, recent: &[PathBuf]) -> Option<Acti
                 if dropping { 2.0 } else { 1.0 },
                 if dropping { ACCENT } else { LINE_STRONG },
             ))
-            .corner_radius(CornerRadius::same(16))
+            .corner_radius(CornerRadius::same(radius::CARD))
             .inner_margin(Margin::symmetric(32, 28))
             .show(ui, |ui| {
                 ui.set_width(width - 64.0);
@@ -43,14 +43,14 @@ pub fn show(ui: &mut Ui, error: Option<&str>, recent: &[PathBuf]) -> Option<Acti
                         } else {
                             "Drop a folder of RAW files here"
                         })
-                        .font(theme::semibold(17.0)),
+                        .font(role::PANEL.font()),
                     );
                     ui.label(widgets::muted(
                         "It is checked first; nothing is written until you start.",
                     ));
                     ui.add_space(16.0);
                     ui.spacing_mut().button_padding = egui::vec2(18.0, 10.0);
-                    if widgets::primary(ui, "Open a folder…").clicked()
+                    if widgets::primary(ui, "Open Folder…").clicked()
                         && let Some(dir) = rfd::FileDialog::new().pick_folder()
                     {
                         action = Some(Action::Open(dir));

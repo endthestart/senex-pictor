@@ -1,6 +1,7 @@
 //! The app's dark, night-friendly look from the design boards: a blue-black ground, raised
 //! cards, a star-blue accent, green for done and amber for things to look at; Inter for text
-//! (from LightCraft, SIL OFL) with a semibold face for headings.
+//! (from LightCraft, SIL OFL) with a semibold face for headings. Colours, corner radii and type
+//! roles follow `docs/DESIGN-TOKENS.md`, shared with SENEX Corvus.
 
 use egui::{Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Stroke, Visuals};
 use std::sync::Arc;
@@ -22,6 +23,50 @@ pub const WARN: Color32 = Color32::from_rgb(240, 169, 59);
 pub const BAD: Color32 = Color32::from_rgb(240, 113, 103);
 
 pub const SEMIBOLD: &str = "semibold";
+
+/// The version of `docs/DESIGN-TOKENS.md` this theme follows.
+pub const TOKENS: &str = "v1";
+
+/// Corner radii in points.
+pub mod radius {
+    pub const CARD: u8 = 12;
+    pub const BUTTON: u8 = 8;
+    pub const TILE: u8 = 8;
+    pub const CONTROL: u8 = 6;
+    pub const KEY: u8 = 4;
+}
+
+/// A size and weight that text plays a part in.
+pub struct Role {
+    pub size: f32,
+    pub semibold: bool,
+}
+
+impl Role {
+    pub fn font(&self) -> FontId {
+        if self.semibold {
+            semibold(self.size)
+        } else {
+            FontId::proportional(self.size)
+        }
+    }
+}
+
+pub mod role {
+    use super::Role;
+
+    const fn role(size: f32, semibold: bool) -> Role {
+        Role { size, semibold }
+    }
+
+    pub const HEADING: Role = role(24.0, true);
+    pub const PANEL: Role = role(15.0, true);
+    pub const STRONG: Role = role(14.0, true);
+    pub const SECONDARY: Role = role(12.0, false);
+    pub const SECTION: Role = role(12.0, false);
+    pub const BADGE: Role = role(11.5, true);
+    pub const NOTE: Role = role(11.0, false);
+}
 
 pub fn semibold(size: f32) -> FontId {
     FontId::new(size, FontFamily::Name(SEMIBOLD.into()))
@@ -65,8 +110,8 @@ pub fn apply(ctx: &egui::Context) {
     v.extreme_bg_color = GROUND;
     v.faint_bg_color = CHROME;
     v.window_stroke = Stroke::new(1.0, LINE);
-    v.window_corner_radius = CornerRadius::same(10);
-    v.menu_corner_radius = CornerRadius::same(8);
+    v.window_corner_radius = CornerRadius::same(radius::CARD);
+    v.menu_corner_radius = CornerRadius::same(radius::BUTTON);
     v.selection.bg_fill = ACCENT_DIM;
     v.selection.stroke = Stroke::new(1.0, ACCENT);
     v.hyperlink_color = ACCENT;
@@ -88,10 +133,10 @@ pub fn apply(ctx: &egui::Context) {
         state.weak_bg_fill = fill;
         state.bg_stroke = Stroke::new(1.0, stroke);
         state.fg_stroke = Stroke::new(1.5, TEXT);
-        state.corner_radius = CornerRadius::same(6);
+        state.corner_radius = CornerRadius::same(radius::CONTROL);
         state.expansion = 0.0;
     }
-    w.noninteractive.corner_radius = CornerRadius::same(6);
+    w.noninteractive.corner_radius = CornerRadius::same(radius::CONTROL);
     ctx.set_visuals_of(egui::Theme::Dark, v.clone());
     ctx.set_visuals_of(egui::Theme::Light, v);
     ctx.set_theme(egui::Theme::Dark);
@@ -105,11 +150,11 @@ pub fn apply(ctx: &egui::Context) {
         s.text_styles
             .insert(egui::TextStyle::Button, FontId::proportional(14.0));
         s.text_styles
-            .insert(egui::TextStyle::Small, FontId::proportional(12.0));
+            .insert(egui::TextStyle::Small, role::SECONDARY.font());
         s.text_styles
             .insert(egui::TextStyle::Monospace, FontId::monospace(12.5));
         s.text_styles
-            .insert(egui::TextStyle::Heading, semibold(24.0));
+            .insert(egui::TextStyle::Heading, role::HEADING.font());
         s.animation_time = 0.1;
     });
 }

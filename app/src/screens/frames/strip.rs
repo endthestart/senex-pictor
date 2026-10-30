@@ -2,7 +2,7 @@
 //! frame as a thumbnail with its flag. Clicking either chooses the frame.
 
 use super::Facts;
-use crate::theme::{ACCENT, CARD, LINE, MUTED, TEXT, WARN};
+use crate::theme::{ACCENT, CARD, LINE, MUTED, TEXT, WARN, radius};
 use crate::thumbs::Thumbs;
 use crate::widgets::{card, legend, section};
 use egui::{Color32, CornerRadius, Rect, RichText, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
@@ -109,10 +109,10 @@ pub fn filmstrip(
                 let r =
                     Rect::from_min_size(rect.min + vec2(i as f32 * cell.x, 0.0), cell).shrink(3.0);
                 let on = i == selected;
-                p.rect_filled(r, CornerRadius::same(8), CARD);
+                p.rect_filled(r, CornerRadius::same(radius::TILE), CARD);
                 p.rect_stroke(
                     r,
-                    CornerRadius::same(8),
+                    CornerRadius::same(radius::TILE),
                     Stroke::new(if on { 2.0 } else { 1.0 }, if on { ACCENT } else { LINE }),
                     StrokeKind::Inside,
                 );
