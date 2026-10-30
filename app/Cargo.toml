@@ -3,6 +3,7 @@ name = "star-photos-app"
 version = "0.1.0"
 edition = "2024"
 publish = false
+license = "MIT OR Apache-2.0"
 description = "Star Photos desktop app (egui on a shared wgpu device, ADR 0011)"
 
 [dependencies]

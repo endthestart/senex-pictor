@@ -134,7 +134,8 @@ Selected LightCraft Classic crates are pinned and vendored with original license
 and notices. See [reuse audit](docs/reuse-audit.md) and
 [source inventory](docs/source-lock.json), pinned to upstream Classic dbe90dc
 (checked 2026-10-25).
-Public distribution license and complete dependency/data attribution audit remain open.
+Star Photos is licensed under either of [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at
+your option. A complete dependency and data attribution audit for distribution remains open.
 
 The prior Python POC and generated baselines remain temporarily for comparison.
 They impose no compatibility requirement and can be removed after useful evidence

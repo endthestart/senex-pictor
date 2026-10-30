@@ -189,8 +189,8 @@ Calibration: only private Canon 40D calibration sets; the decoder exposes no shu
 mode, compression, NR or temperature, which ADR 0006 needs for dark matching.
 
 No complete dark/flat/bias calibration, shared development recipe, camera
-characterization, color-managed master export, TIFF input, PSF/photometry study,
-GPU acceleration, desktop interface, public license selection or distribution audit.
+characterization, color-managed master export, TIFF input, PSF/photometry study or
+distribution audit. Licence: MIT OR Apache-2.0 (owner decision, 2026-10-29).
 Decoder-provided defaults versus explicitly recorded camera values need deeper audit.
 Current diagnostics are not release-quality photographic outputs.
 
@@ -208,5 +208,5 @@ Current diagnostics are not release-quality photographic outputs.
    scenes; investigate memory peaks before scaling simultaneous frame work.
 
 The Python POC and prior outputs remain temporarily as private comparison evidence;
-the native application does not depend on them. No Git repository initialization,
-commit, push, original-image modification or publication was performed.
+the native application does not depend on them. No original image was modified and
+nothing was published.
