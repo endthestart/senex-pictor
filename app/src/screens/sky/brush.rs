@@ -1,14 +1,20 @@
 //! Correcting the matte by hand: brushes that paint sky or ground over the result in scene
-//! (store) pixels, drawn as translucent strokes, with undo. Move (V) pans; Sky (S) and Ground
+//! (store) pixels, with undo. The strokes are drawn as the engine applies them, rasterised into
+//! one translucent layer, so what shows is what Apply paints. Move (V) pans; Sky (S) and Ground
 //! (G) paint with the primary button while the others, or Space, pan; [ and ] size the brush.
 
 use crate::viewer::Viewer;
-use egui::{Color32, Key, PointerButton, Response, Stroke as Line, Ui};
-use pictor_engine::separate::corrections::Stroke;
+use egui::{
+    Color32, ColorImage, Key, PointerButton, Rect, Response, Stroke as Line, TextureHandle, Ui,
+    pos2,
+};
+use pictor_engine::separate::corrections::{Stroke, force};
 
 const SKY_PAINT: Color32 = Color32::from_rgba_premultiplied(30, 56, 96, 110);
 const GROUND_PAINT: Color32 = Color32::from_rgba_premultiplied(120, 56, 52, 110);
 pub const RADIUS_RANGE: std::ops::RangeInclusive<f32> = 4.0..=400.0;
+/// Longest side of the drawn layer, px.
+const LAYER_SIDE: usize = 1600;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Tool {
@@ -25,6 +31,8 @@ pub struct Brush {
     /// The strokes the store holds.
     pub saved: Vec<Stroke>,
     drawing: bool,
+    /// The strokes rasterised, with a hash of what they were drawn from.
+    layer: Option<(u64, TextureHandle)>,
 }
 
 impl Brush {
@@ -35,6 +43,7 @@ impl Brush {
             strokes: saved.clone(),
             saved,
             drawing: false,
+            layer: None,
         }
     }
 
@@ -123,20 +132,14 @@ impl Brush {
         }
         let painter = ui.painter_at(rect);
         let scale = viewer.points_per_scene(rect, ppp);
-        for s in &self.strokes {
-            let colour = if s.sky { SKY_PAINT } else { GROUND_PAINT };
-            let r = s.radius * scale;
-            let points: Vec<egui::Pos2> = s
-                .points
-                .iter()
-                .map(|&p| viewer.screen_at(rect, ppp, p))
-                .collect();
-            for pair in points.windows(2) {
-                painter.line_segment([pair[0], pair[1]], Line::new(2.0 * r, colour));
-            }
-            for &p in &points {
-                painter.circle_filled(p, r, colour);
-            }
+        if let Some(texture) = self.layer(ctx, viewer) {
+            let (w, h) = (viewer.scene.width as f32, viewer.scene.height as f32);
+            let shown = Rect::from_min_max(
+                viewer.screen_at(rect, ppp, [0.0, 0.0]),
+                viewer.screen_at(rect, ppp, [w, h]),
+            );
+            let uv = Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0));
+            painter.image(texture.id(), shown, uv, Color32::WHITE);
         }
         if sky.is_some()
             && let Some(pos) = response.hover_pos()
@@ -148,5 +151,60 @@ impl Brush {
                 Line::new(1.0, Color32::BLACK),
             );
         }
+    }
+
+    /// The strokes rasterised at most LAYER_SIDE px on the long side, redrawn when they changed;
+    /// none without strokes.
+    fn layer(&mut self, ctx: &egui::Context, viewer: &Viewer) -> Option<TextureHandle> {
+        if self.strokes.is_empty() {
+            return None;
+        }
+        let drawn = {
+            use std::hash::{Hash, Hasher};
+            let mut hash = std::collections::hash_map::DefaultHasher::new();
+            for s in &self.strokes {
+                (s.sky, s.radius.to_bits()).hash(&mut hash);
+                for p in &s.points {
+                    (p[0].to_bits(), p[1].to_bits()).hash(&mut hash);
+                }
+            }
+            hash.finish()
+        };
+        if let Some((from, texture)) = &self.layer
+            && *from == drawn
+        {
+            return Some(texture.clone());
+        }
+        let (w, h) = (viewer.scene.width as usize, viewer.scene.height as usize);
+        let step = w.max(h).div_ceil(LAYER_SIDE).max(1);
+        let (lw, lh) = (w.div_ceil(step), h.div_ceil(step));
+        let k = step as f32;
+        let scaled: Vec<Stroke> = self
+            .strokes
+            .iter()
+            .map(|s| Stroke {
+                sky: s.sky,
+                radius: s.radius / k,
+                points: s.points.iter().map(|p| [p[0] / k, p[1] / k]).collect(),
+            })
+            .collect();
+        let pixels = force(&scaled, lw, lh)
+            .into_iter()
+            .map(|f| match f {
+                1 => SKY_PAINT,
+                -1 => GROUND_PAINT,
+                _ => Color32::TRANSPARENT,
+            })
+            .collect();
+        let image = ColorImage::new([lw, lh], pixels);
+        let texture = match self.layer.take() {
+            Some((_, mut t)) => {
+                t.set(image, egui::TextureOptions::LINEAR);
+                t
+            }
+            None => ctx.load_texture("corrections", image, egui::TextureOptions::LINEAR),
+        };
+        self.layer = Some((drawn, texture.clone()));
+        Some(texture)
     }
 }
