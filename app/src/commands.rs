@@ -12,7 +12,10 @@ pub enum Command {
     Open,
     Settings,
     Step(Step),
+    /// From the menu bar, which only macOS has yet.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     Fit,
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     Zoom(f32),
 }
 
