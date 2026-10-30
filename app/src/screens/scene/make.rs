@@ -32,6 +32,7 @@ fn preview(store: &Store, out: &Path, name: &str) -> pictor_engine::Result<()> {
             tiff: false,
             single: false,
             linear: false,
+            hdr: None,
         },
     )?;
     Ok(())

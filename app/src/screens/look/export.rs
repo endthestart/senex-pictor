@@ -17,17 +17,18 @@ pub enum Format {
     Master,
     Tiff,
     Jpeg,
+    Hdr,
 }
 
-/// `dir/name.ext`, numbered when taken.
-fn free_stem(dir: &Path, name: &str, ext: &str) -> PathBuf {
-    let mut stem = dir.join(name);
+/// `dir/name` such that `dir/name{tail}` is free, numbered when taken.
+fn free_stem(dir: &Path, name: &str, tail: &str) -> PathBuf {
+    let mut stem = name.to_string();
     let mut k = 2;
-    while stem.with_extension(ext).exists() {
-        stem = dir.join(format!("{name} {k}"));
+    while dir.join(format!("{stem}{tail}")).exists() {
+        stem = format!("{name} {k}");
         k += 1;
     }
-    stem
+    dir.join(stem)
 }
 
 impl LookStep {
@@ -69,6 +70,11 @@ impl LookStep {
                     "JPEG",
                     "This look, 2400 px on the long side, for sharing",
                 ),
+                (
+                    Format::Hdr,
+                    "HDR JPEG",
+                    "As the JPEG, with the brightest stars above paper white on HDR displays",
+                ),
             ] {
                 ui.radio_value(&mut self.format, format, name);
                 ui.label(RichText::new(note).size(12.0).color(MUTED));
@@ -90,16 +96,18 @@ impl LookStep {
 
     fn start_export(&mut self, viewer: &Viewer, run: &Run, result: &str) {
         let look_name = viewer.names[0].to_lowercase();
-        let (name, ext) = match self.format {
-            Format::Master => (format!("{result}-linear-master"), "tif"),
-            Format::Tiff => (format!("{result}-{look_name}"), "tif"),
-            Format::Jpeg => (format!("{result}-{look_name}"), "jpg"),
+        let (name, tail) = match self.format {
+            Format::Master => (format!("{result}-linear-master"), "-linear.tif"),
+            Format::Tiff => (format!("{result}-{look_name}"), ".tif"),
+            Format::Jpeg => (format!("{result}-{look_name}"), ".jpg"),
+            Format::Hdr => (format!("{result}-{look_name}"), "-hdr.jpg"),
         };
-        let stem = free_stem(&run.out, &name, ext);
-        let (jpeg, tiff, linear) = match self.format {
-            Format::Master => (None, false, true),
-            Format::Tiff => (None, true, false),
-            Format::Jpeg => (Some(review::SIDE), false, false),
+        let stem = free_stem(&run.out, &name, tail);
+        let (jpeg, tiff, linear, hdr) = match self.format {
+            Format::Master => (None, false, true, None),
+            Format::Tiff => (None, true, false, None),
+            Format::Jpeg => (Some(review::SIDE), false, false, None),
+            Format::Hdr => (None, false, false, Some(super::HDR_HEADROOM)),
         };
         let (dir, result, look) = (run.store.dir.clone(), result.to_string(), viewer.look[0]);
         self.error = None;
@@ -116,6 +124,7 @@ impl LookStep {
                     tiff,
                     single: false,
                     linear,
+                    hdr,
                 },
             )?;
             Ok(report.files)

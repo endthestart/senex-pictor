@@ -30,6 +30,9 @@ const PRESETS: [(&str, &str, Look); 2] = [
     ),
 ];
 
+/// Headroom over paper white of the HDR preview and JPEG: two stops for the brightest stars.
+const HDR_HEADROOM: f32 = 4.0;
+
 pub struct LookStep {
     pub canvas: Canvas,
     more: bool,
@@ -220,6 +223,31 @@ impl LookStep {
                 }
             });
         }
+        card(ui, |ui| {
+            section(ui, "HDR");
+            match viewer.display.headroom.filter(|&h| h > 1.0) {
+                Some(h) => {
+                    let on = viewer.top > 1.0;
+                    if widgets::toggle(ui, on, "HDR preview", None).clicked() {
+                        let top = if on { 1.0 } else { h.min(HDR_HEADROOM) };
+                        if let Err(e) = viewer.set_top(top) {
+                            self.error = Some(e.to_string());
+                        }
+                    }
+                    ui.label(widgets::muted(format!(
+                        "The brightest stars above paper white, up to {:.1}× on this screen; \
+                         the HDR JPEG keeps them for HDR displays.",
+                        h.min(HDR_HEADROOM)
+                    )));
+                }
+                None => {
+                    ui.label(widgets::muted(
+                        "This screen shows no light above paper white; the HDR JPEG still keeps \
+                         the brightest stars for HDR displays.",
+                    ));
+                }
+            }
+        });
         self.export_card(ui, viewer, run, result);
         if let Some(e) = &self.error {
             ui.colored_label(WARN, e);

@@ -4,6 +4,7 @@ pub mod command;
 pub mod export;
 pub mod flow;
 pub mod gpu;
+pub mod hdr;
 pub mod input;
 pub mod integrate;
 pub mod lens;

@@ -277,6 +277,7 @@ pub fn process(o: &Options, survey: &Survey, budget: &Budget) -> Result<Report> 
                 tiff: true,
                 single: false,
                 linear: false,
+                hdr: None,
             },
         )
     })?;

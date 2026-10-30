@@ -60,6 +60,7 @@ impl Pictor {
             None => Display {
                 scale: 1.0,
                 mode: crate::gpu::canvas::MODE_ENCODE,
+                headroom: None,
                 lines: vec!["the window did not start with wgpu".into()],
             },
         };

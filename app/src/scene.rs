@@ -22,7 +22,8 @@ pub struct LookParams {
     pub white: f32,
     pub remove_glow: f32,
     pub norm: f32,
-    pub pad: f32,
+    /// Light kept up to this many times paper white (1 for SDR).
+    pub top: f32,
 }
 
 impl LookParams {
@@ -36,7 +37,7 @@ impl LookParams {
             white: 1.0,
             remove_glow: if look.remove_glow { 1.0 } else { 0.0 },
             norm: look.stretch.asinh(),
-            pad: 0.0,
+            top: 1.0,
         }
     }
 

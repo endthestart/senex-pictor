@@ -9,6 +9,8 @@ use eframe::egui_wgpu::RenderState;
 pub struct Display {
     pub scale: f32,
     pub mode: u32,
+    /// How far above paper white the screen can show light, when it reports it.
+    pub headroom: Option<f32>,
     pub lines: Vec<String>,
 }
 
@@ -43,6 +45,11 @@ impl Display {
                 None => "HDR headroom: not reported".into(),
             },
         ];
-        Display { scale, mode, lines }
+        Display {
+            scale,
+            mode,
+            headroom,
+            lines,
+        }
     }
 }

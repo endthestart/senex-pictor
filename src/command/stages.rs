@@ -228,7 +228,9 @@ pub fn render(dir: &Path, planes: &str, out: &Path, rest: &[OsString]) -> Result
     let store = Store::open(dir)?;
     let o = flags(
         rest,
-        &["--matrix", "--look", "--side", "--single", "--linear"],
+        &[
+            "--matrix", "--look", "--side", "--single", "--linear", "--hdr",
+        ],
     )?;
     let yes = |name: &str| o.get(name).is_some_and(|v| v == "yes");
     review::render(
@@ -242,6 +244,10 @@ pub fn render(dir: &Path, planes: &str, out: &Path, rest: &[OsString]) -> Result
             tiff: true,
             single: yes("--single"),
             linear: yes("--linear"),
+            hdr: o
+                .get("--hdr")
+                .map(|v| v.parse().map_err(|e| error(format!("--hdr: {e}"))))
+                .transpose()?,
         },
     )
 }

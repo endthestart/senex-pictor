@@ -79,11 +79,24 @@ pub fn camera_to_srgb(xyz_to_camera: &Matrix) -> Result<Matrix> {
 }
 
 pub fn encode(v: f32) -> f32 {
-    let a = v.clamp(0.0, 1.0);
+    encode_to(v, 1.0)
+}
+
+/// The sRGB curve extended past 1 for light up to `top` times paper white.
+fn encode_to(v: f32, top: f32) -> f32 {
+    let a = v.clamp(0.0, top);
     if a <= 0.003_130_8 {
         12.92 * a
     } else {
         1.055 * a.powf(1.0 / 2.4) - 0.055
+    }
+}
+
+pub fn decode(v: f32) -> f32 {
+    if v <= 0.040_45 {
+        v / 12.92
+    } else {
+        ((v + 0.055) / 1.055).powf(2.4)
     }
 }
 
@@ -166,6 +179,17 @@ pub fn saturate(d: f32, l: f32, saturation: f32) -> f32 {
 
 /// Display values in 0..=1 (sRGB-encoded): black removed, saturation, asinh stretch, shadow curve.
 pub fn finish(rgb: &[[f32; 3]], black: [f32; 3], scale: f32, look: &Look) -> Vec<[f32; 3]> {
+    finish_to(rgb, black, scale, look, 1.0)
+}
+
+/// `finish` with light kept up to `top` times paper white.
+fn finish_to(
+    rgb: &[[f32; 3]],
+    black: [f32; 3],
+    scale: f32,
+    look: &Look,
+    top: f32,
+) -> Vec<[f32; 3]> {
     let norm = look.stretch.asinh();
     rgb.iter()
         .map(|c| {
@@ -174,7 +198,7 @@ pub fn finish(rgb: &[[f32; 3]], black: [f32; 3], scale: f32, look: &Look) -> Vec
             std::array::from_fn(|k| {
                 let s = saturate(d[k], l, look.saturation);
                 let y = (look.stretch * (s / scale).max(0.0)).asinh() / norm;
-                encode(y.powf(look.shadows))
+                encode_to(y.powf(look.shadows), top)
             })
         })
         .collect()
@@ -188,8 +212,9 @@ fn display(
     black: [f32; 3],
     scale: f32,
     look: &Look,
+    top: f32,
 ) -> Vec<[f32; 3]> {
-    finish(rgb, black, scale, look)
+    finish_to(rgb, black, scale, look, top)
         .iter()
         .zip(rgb)
         .zip(scene.alpha)
@@ -210,8 +235,29 @@ pub fn compare(images: &[&[[f32; 3]]], scene: &Scene, look: &Look) -> Result<Vec
     let (black, scale) = levels(first, scene.clear, look)?;
     Ok(rgbs
         .iter()
-        .map(|r| display(r, scene, black, scale, look))
+        .map(|r| display(r, scene, black, scale, look, 1.0))
         .collect())
+}
+
+/// Linear display light of `image` for SDR (0..=1) and for an HDR display (stretched sky up to
+/// `headroom` times paper white; the same where the SDR rendering is not clipped).
+pub fn hdr(
+    image: &[[f32; 3]],
+    scene: &Scene,
+    look: &Look,
+    headroom: f32,
+) -> Result<[Vec<[f32; 3]>; 2]> {
+    if !(scene.white.is_finite() && scene.white > 0.0) {
+        return Err(error("render: the sensor white must be positive"));
+    }
+    let rgb = linear(image, scene, look);
+    let (black, scale) = levels(&rgb, scene.clear, look)?;
+    Ok([1.0, headroom].map(|top| {
+        display(&rgb, scene, black, scale, look, top)
+            .iter()
+            .map(|c| c.map(decode))
+            .collect()
+    }))
 }
 
 #[cfg(test)]

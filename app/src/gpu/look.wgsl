@@ -12,7 +12,7 @@ struct Look {
     white: f32,
     remove_glow: f32,
     norm: f32,
-    pad: f32,
+    top: f32,
 };
 
 @group(0) @binding(0) var<uniform> look: Look;
@@ -23,8 +23,9 @@ struct Look {
 
 const WEIGHTS = vec3<f32>(0.2126, 0.7152, 0.0722);
 
-fn encode(v: f32) -> f32 {
-    let a = clamp(v, 0.0, 1.0);
+// render::encode_to: the sRGB curve, extended past 1 up to `top` times paper white.
+fn encode(v: f32, top: f32) -> f32 {
+    let a = clamp(v, 0.0, top);
     return select(1.055 * pow(a, 1.0 / 2.4) - 0.055, 12.92 * a, a <= 0.0031308);
 }
 
@@ -47,8 +48,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     for (var k = 0; k < 3; k++) {
         let sv = max(l + look.saturation * (d[k] - l), d[k] / look.saturation);  // render::saturate
         let y = asinh(look.stretch * max(sv / look.scale, 0.0)) / look.norm;
-        let sky = encode(pow(y, look.shadows));
-        let ground = encode(c[k] / look.white);
+        let sky = encode(pow(y, look.shadows), look.top);
+        let ground = encode(c[k] / look.white, 1.0);
         shown[k] = decode(s.a * sky + (1.0 - s.a) * ground);
     }
     textureStore(out, id.xy, vec4<f32>(shown, s.a));

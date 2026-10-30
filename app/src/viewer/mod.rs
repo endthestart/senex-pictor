@@ -28,6 +28,8 @@ pub struct Viewer {
     pub zoom: Zoom,
     pub centre: [f32; 2],
     pub recompute_ms: Option<f64>,
+    /// Light kept above paper white for an HDR preview (1 shows SDR).
+    pub top: f32,
 }
 
 impl Viewer {
@@ -62,6 +64,7 @@ impl Viewer {
             zoom: Zoom::Fit,
             centre: [size[0] as f32 / 2.0, size[1] as f32 / 2.0],
             recompute_ms: None,
+            top: 1.0,
         })
     }
 
@@ -74,6 +77,7 @@ impl Viewer {
     }
 
     fn apply(&mut self, k: usize) -> Result<()> {
+        self.params[k].top = self.top;
         let t = self
             .looks
             .apply(&self.device, &self.queue, k, &self.params[k])?;
@@ -99,6 +103,13 @@ impl Viewer {
         };
         self.look[k] = look;
         self.apply(k)
+    }
+
+    /// Shows both renderings with light up to `top` times paper white (1 for SDR).
+    pub fn set_top(&mut self, top: f32) -> Result<()> {
+        self.top = top;
+        self.apply(0)?;
+        self.apply(1)
     }
 
     /// Puts `look` (named `name`) in rendering `k`.

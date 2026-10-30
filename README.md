@@ -42,7 +42,8 @@ takes corrections painted as sky or ground (S, G), applied in the background;
 **Scene** makes a hero frame or a short-window moment and opens it; **Compare** keeps two
 renderings on the GPU (Space swaps in place, S splits, chosen regions as 200% crops with
 A / same / B verdicts saved to `compare.json`); **Look & export** tunes the look live and
-exports the linear 32-bit master, a 16-bit TIFF or a JPEG. Drop a folder on the window or
+exports the linear 32-bit master, a 16-bit TIFF, a JPEG or an HDR JPEG, with an HDR
+preview on screens that show light above paper white. Drop a folder on the window or
 run `cargo run --release -p pictor -- [FOLDER] [--step NAME]`.
 `cargo test -p pictor` renders the window headlessly (`PICTOR_UI_SHOTS=DIR`
 saves the frames; `PICTOR_UI_FOLDER`, `PICTOR_UI_RAW` and `PICTOR_UI_STOPPED`
@@ -85,7 +86,8 @@ The stages also run one at a time:
 - `moment STORE --centre NAME [--half N]`: a short-window sky (aurora) with the deep stars.
 - `render STORE PLANES OUT_PREFIX [--matrix JSON] [--look natural|dark]`: JPEG and 16-bit
   TIFF (`--single yes` adds the reference frame at the same levels, `--linear yes` a linear
-  float TIFF). The camera's colour matrix comes from `data/colour-matrices.json` unless a file
+  float TIFF, `--hdr 4` an HDR JPEG: the SDR picture with an ISO 21496-1 / Ultra HDR gain map
+  that lifts the brightest stars up to four times paper white on HDR displays). The camera's colour matrix comes from `data/colour-matrices.json` unless a file
   is given.
 - `flat INPUT [LENS]`: the lensfun vignetting profile for the file's lens, focal length and
   aperture (lensfun's database is read in place; set `PICTOR_LENSFUN` to choose it).

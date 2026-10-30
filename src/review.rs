@@ -80,6 +80,9 @@ pub struct Options<'a> {
     pub tiff: bool,
     pub single: bool,
     pub linear: bool,
+    /// An HDR gain-map JPEG (`{out}-hdr.jpg`, the JPEG's size) for displays with this much
+    /// headroom over paper white.
+    pub hdr: Option<f32>,
 }
 
 fn rgb_of(p: &planes::Planes, prefix: &str) -> Result<Vec<[f32; 3]>> {
@@ -240,6 +243,15 @@ pub fn render(store: &Store, o: &Options) -> Result<Report> {
             )?;
             files.push(format!("{name}.tif"));
         }
+    }
+    if let Some(headroom) = o.hdr {
+        let [sdr, hdr] = render::hdr(image, &scene, &o.look, headroom)?;
+        let side = o.jpeg.unwrap_or(SIDE);
+        let (sdr, sw, sh) = export::reduce(&sdr, w, h, side);
+        let (hdr, _, _) = export::reduce(&hdr, w, h, side);
+        let path = format!("{stem}-hdr.jpg");
+        std::fs::write(&path, crate::hdr::gain_map_jpeg(&sdr, &hdr, (sw, sh), 92)?)?;
+        files.push(path);
     }
     if o.linear {
         export::linear(
