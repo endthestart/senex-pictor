@@ -5,6 +5,7 @@
 use crate::flow::{self, Gray, Pyramid};
 use crate::stars::similarity::{Point, Random};
 use crate::stars::{detect, triangles};
+use rayon::prelude::*;
 use serde::Serialize;
 
 /// Log scale of the feature image (ADU of a 2×2 site sum).
@@ -59,14 +60,41 @@ pub fn look(above: &[f32], (cw, ch): (usize, usize)) -> crate::Result<Look> {
     })
 }
 
-/// Median shift of lower-half corners from `a` to `b` (full-resolution px), or None when
-/// fewer than MIN_TRACKED corners survive the round trip.
-pub fn foreground_step(a: &Look, b: &Look) -> Option<[f64; 2]> {
+/// Adds to `steps` the foreground and sky steps between each neighbouring pair of `chain`,
+/// the first pair's being frame `first`'s. Each frame's pyramid serves both its steps, built
+/// for as many frames at a time as the pool has threads.
+pub fn measure(chain: &[&Look], first: usize, steps: &mut Steps) {
+    let pairs = chain.len().saturating_sub(1);
+    let group = rayon::current_num_threads().max(1);
+    for start in (0..pairs).step_by(group) {
+        let part = &chain[start..(start + group + 1).min(chain.len())];
+        let pyramids: Vec<Pyramid> = part.par_iter().map(|l| Pyramid::new(&l.features)).collect();
+        let measured: Vec<_> = part
+            .par_windows(2)
+            .zip(pyramids.par_windows(2))
+            .enumerate()
+            .map(|(k, (w, p))| {
+                let mut random = Random::new((first + start + k) as u64);
+                (
+                    foreground_step(w[0], &p[0], &p[1]),
+                    sky_step(w[0], w[1], &mut random),
+                )
+            })
+            .collect();
+        for (f, s) in measured {
+            steps.foreground.push(f);
+            steps.sky.push(s);
+        }
+    }
+}
+
+/// Median shift of lower-half corners from `a` (pyramid `pa`) to pyramid `pb`
+/// (full-resolution px), or None when fewer than MIN_TRACKED corners survive the round trip.
+fn foreground_step(a: &Look, pa: &Pyramid, pb: &Pyramid) -> Option<[f64; 2]> {
     let (w, h) = (a.features.width, a.features.height);
     let allowed: Vec<bool> = (0..w * h).map(|i| i / w >= h / 2).collect();
     let corners = flow::corners(&a.features, &allowed, CORNERS, CORNER_SPACING);
-    let (pa, pb) = (Pyramid::new(&a.features), Pyramid::new(&b.features));
-    let moved: Vec<[f64; 2]> = flow::follow_checked(&pa, &pb, &corners, None, ROUND_TRIP_PX)
+    let moved: Vec<[f64; 2]> = flow::follow_checked(pa, pb, &corners, None, ROUND_TRIP_PX)
         .iter()
         .zip(&corners)
         .filter_map(|(f, c)| f.map(|f| [f[0] - c[0], f[1] - c[1]]))
@@ -88,7 +116,7 @@ pub fn foreground_step(a: &Look, b: &Look) -> Option<[f64; 2]> {
 }
 
 /// The stars' similarity step from `a` to `b`: translation (full-resolution px), rotation (°).
-pub fn sky_step(a: &Look, b: &Look, random: &mut Random) -> Option<[f64; 3]> {
+fn sky_step(a: &Look, b: &Look, random: &mut Random) -> Option<[f64; 3]> {
     if a.stars.len() < MIN_STARS || b.stars.len() < MIN_STARS {
         return None;
     }

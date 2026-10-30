@@ -1,7 +1,7 @@
 //! Corners and pyramidal Lucas–Kanade tracking (after Shi–Tomasi and Bouguet, as in OpenCV's
 //! goodFeaturesToTrack and calcOpticalFlowPyrLK, the prototype's oracle).
 
-use super::image::Gray;
+use super::image::{Gray, Tap};
 use crate::stars::similarity::Point;
 use rayon::prelude::*;
 
@@ -140,21 +140,19 @@ pub fn follow(
                 } else {
                     flow = [flow[0] * 2.0, flow[1] * 2.0];
                 }
+                let xs: Vec<f64> = (0..WINDOW).map(|i| centre[0] + i as f64 - half).collect();
+                let ys: Vec<f64> = (0..WINDOW).map(|j| centre[1] + j as f64 - half).collect();
+                let tx = taps(xs.iter().copied(), a.image.width)?;
+                let ty = taps(ys.iter().copied(), a.image.height)?;
                 let mut patch = Vec::with_capacity(WINDOW * WINDOW);
                 let (mut gxx, mut gxy, mut gyy) = (0.0f64, 0.0f64, 0.0f64);
-                for j in 0..WINDOW {
-                    for i in 0..WINDOW {
-                        let (x, y) = (centre[0] + i as f64 - half, centre[1] + j as f64 - half);
-                        let (Some(v), Some(dx), Some(dy)) =
-                            (a.image.sample(x, y), a.gx.sample(x, y), a.gy.sample(x, y))
-                        else {
-                            return None;
-                        };
-                        let (dx, dy) = (f64::from(dx), f64::from(dy));
+                for &y in &ty {
+                    for &x in &tx {
+                        let (dx, dy) = (f64::from(a.gx.sample(x, y)), f64::from(a.gy.sample(x, y)));
                         gxx += dx * dx;
                         gxy += dx * dy;
                         gyy += dy * dy;
-                        patch.push((x, y, f64::from(v), dx, dy));
+                        patch.push((f64::from(a.image.sample(x, y)), dx, dy));
                     }
                 }
                 let area = (WINDOW * WINDOW) as f64;
@@ -165,11 +163,15 @@ pub fn follow(
                     return None;
                 }
                 for _ in 0..ROUNDS {
+                    let tx = taps(xs.iter().map(|x| x + flow[0]), b.image.width)?;
+                    let ty = taps(ys.iter().map(|y| y + flow[1]), b.image.height)?;
                     let (mut bx, mut by) = (0.0, 0.0);
-                    for &(x, y, v, dx, dy) in &patch {
-                        let w = f64::from(b.image.sample(x + flow[0], y + flow[1])?);
-                        bx += (v - w) * dx;
-                        by += (v - w) * dy;
+                    for (&y, row) in ty.iter().zip(patch.chunks(WINDOW)) {
+                        for (&x, &(v, dx, dy)) in tx.iter().zip(row) {
+                            let w = f64::from(b.image.sample(x, y));
+                            bx += (v - w) * dx;
+                            by += (v - w) * dy;
+                        }
                     }
                     let step = [(gyy * bx - gxy * by) / det, (gxx * by - gxy * bx) / det];
                     flow = [flow[0] + step[0], flow[1] + step[1]];
@@ -181,6 +183,13 @@ pub fn follow(
             Some([p[0] + flow[0], p[1] + flow[1]])
         })
         .collect()
+}
+
+/// Taps at `coords` along an axis of `n` samples, or None when any falls outside. A window's
+/// x varies only along its rows and y only down its columns, so it needs one tap per column
+/// and one per row.
+fn taps(coords: impl Iterator<Item = f64>, n: usize) -> Option<Vec<Tap>> {
+    coords.map(|c| Tap::at(c, n)).collect()
 }
 
 /// `follow` there and back: points that return within `tolerance` px of where they started.

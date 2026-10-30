@@ -7,7 +7,6 @@ use super::motion::{self, Look, Steps};
 use super::thumb::{self, Thumb};
 use crate::budget::Budget;
 use crate::calibration::Mosaic;
-use crate::stars::similarity::Random;
 use crate::store::seconds;
 use crate::{Result, error, input};
 use serde::{Deserialize, Serialize};
@@ -172,21 +171,7 @@ pub fn capture_all(paths: &[std::path::PathBuf], budget: &Budget) -> Result<Capt
             }
             let chain: Vec<&Look> = previous.iter().chain(looks.iter()).collect();
             let first = captures.len() + usize::from(previous.is_none());
-            let measured: Vec<_> = chain
-                .par_windows(2)
-                .enumerate()
-                .map(|(k, w)| {
-                    let mut random = Random::new((first + k) as u64);
-                    (
-                        motion::foreground_step(w[0], w[1]),
-                        motion::sky_step(w[0], w[1], &mut random),
-                    )
-                })
-                .collect();
-            for (f, s) in measured {
-                steps.foreground.push(f);
-                steps.sky.push(s);
-            }
+            motion::measure(&chain, first, &mut steps);
             captures.extend(caps);
             previous = looks.pop();
         }
