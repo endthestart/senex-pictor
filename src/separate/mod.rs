@@ -62,11 +62,9 @@ pub struct Report {
 }
 
 const STATS: &str = "stats.planes";
-const STATS_PLANES: [&str; 9] = [
-    "median",
+const STATS_PLANES: [&str; 7] = [
     "low",
     "sigma",
-    "excess",
     "transit",
     "scatter",
     "resolvable",
@@ -76,11 +74,9 @@ const STATS_PLANES: [&str; 9] = [
 
 fn save_stats(store: &Store, s: &stats::Stats) -> Result<()> {
     let resolvable = planes::bools(&s.resolvable);
-    let values: [&[f32]; 9] = [
-        &s.median,
+    let values: [&[f32]; 7] = [
         &s.low,
         &s.sigma,
-        &s.excess,
         &s.transit,
         &s.scatter,
         &resolvable,
@@ -97,10 +93,8 @@ fn load_stats(store: &Store) -> Result<stats::Stats> {
     Ok(stats::Stats {
         width: p.width,
         height: p.height,
-        median: get("median")?,
         low: get("low")?,
         sigma: get("sigma")?,
-        excess: get("excess")?,
         transit: get("transit")?,
         scatter: get("scatter")?,
         resolvable: p.get("resolvable")?.iter().map(|&v| v > 0.5).collect(),

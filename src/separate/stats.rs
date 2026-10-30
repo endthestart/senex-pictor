@@ -29,13 +29,10 @@ const TREND_BYTES_PER_PIXEL: u64 = 24;
 pub struct Stats {
     pub width: usize,
     pub height: usize,
-    pub median: Vec<f32>,
     /// 20th percentile of luminance over frames.
     pub low: Vec<f32>,
     /// Robust temporal noise after removing each frame's large-scale trend.
     pub sigma: Vec<f32>,
-    /// Share of frames with a > TRANSIT_SIGMA excess.
-    pub excess: Vec<f32>,
     /// Share of frames with a sky-coherent transit (0 unless half the events cohere).
     pub transit: Vec<f32>,
     /// Temporal standard deviation after removing the trend.
@@ -107,10 +104,8 @@ pub fn temporal_stats(
     let mut out = Stats {
         width: w,
         height: h,
-        median: Vec::with_capacity(w * h),
         low: Vec::with_capacity(w * h),
         sigma: Vec::with_capacity(w * h),
-        excess: Vec::with_capacity(w * h),
         transit: Vec::with_capacity(w * h),
         scatter: Vec::with_capacity(w * h),
         resolvable: (0..w * h)
@@ -120,10 +115,8 @@ pub fn temporal_stats(
         blue: Vec::with_capacity(w * h),
     };
     for s in strips {
-        out.median.extend(s.median);
         out.low.extend(s.low);
         out.sigma.extend(s.sigma);
-        out.excess.extend(s.excess);
         out.transit.extend(s.transit);
         out.scatter.extend(s.scatter);
         for c in s.colour {
@@ -136,10 +129,8 @@ pub fn temporal_stats(
 }
 
 struct Strip {
-    median: Vec<f32>,
     low: Vec<f32>,
     sigma: Vec<f32>,
-    excess: Vec<f32>,
     transit: Vec<f32>,
     scatter: Vec<f32>,
     colour: Vec<[f32; 3]>,
@@ -185,13 +176,9 @@ fn strip(c: &Context, y0: usize, y1: usize) -> Result<Strip> {
             *b = v[f * plane + p];
         }
     };
-    let (mut med, mut low) = (
-        Vec::with_capacity(core.len()),
-        Vec::with_capacity(core.len()),
-    );
+    let mut low = Vec::with_capacity(core.len());
     for p in core.clone() {
         gather(&v, p, &mut buf);
-        med.push(median(&mut buf));
         low.push(percentile(&mut buf, 20.0));
     }
     for p in 0..plane {
@@ -246,10 +233,7 @@ fn strip(c: &Context, y0: usize, y1: usize) -> Result<Strip> {
         }
     }
     let gw = w.div_ceil(CELL);
-    let (mut excess, mut transit) = (
-        Vec::with_capacity(core.len()),
-        Vec::with_capacity(core.len()),
-    );
+    let mut transit = Vec::with_capacity(core.len());
     for p in core {
         let (x, y) = (p % w, ya + p / w);
         let cell = (y / CELL) * gw + x / CELL;
@@ -279,7 +263,6 @@ fn strip(c: &Context, y0: usize, y1: usize) -> Result<Strip> {
                 });
             hits += usize::from(coherent);
         }
-        excess.push(events as f32 / n as f32);
         transit.push(if 2 * hits >= events {
             hits as f32 / n as f32
         } else {
@@ -287,10 +270,8 @@ fn strip(c: &Context, y0: usize, y1: usize) -> Result<Strip> {
         });
     }
     Ok(Strip {
-        median: med,
         low,
         sigma,
-        excess,
         transit,
         scatter,
         colour,

@@ -77,10 +77,8 @@ fn scene() -> Stats {
     Stats {
         width: w,
         height: h,
-        median: p(&level),
         low: p(&level),
         sigma: p(&|_, _| 20.0),
-        excess: p(&|x, y| if crossed(x, y) { 0.02 } else { 0.0 }),
         transit: p(&|x, y| if crossed(x, y) { 0.02 } else { 0.0 }),
         scatter: p(&|_, _| 20.0),
         resolvable: vec![true; w * h],
