@@ -3,6 +3,7 @@
 //! prototype's oracles).
 
 use super::filters::nearest_known;
+use rayon::prelude::*;
 
 /// Block size of each frame's large-scale brightness trend.
 pub const TREND_BLOCK: usize = 64;
@@ -130,14 +131,16 @@ pub fn resize(grid: &[f64], columns: usize, rows: usize, width: usize, height: u
             .collect()
     };
     let (xs, ys) = (axis(width, columns), axis(height, rows));
-    let mut out = Vec::with_capacity(width * height);
-    for &(y0, y1, fy) in &ys {
-        for &(x0, x1, fx) in &xs {
-            let v = |i: usize, j: usize| grid[j * columns + i];
-            let top = v(x0, y0) * (1.0 - fx) + v(x1, y0) * fx;
-            let bottom = v(x0, y1) * (1.0 - fx) + v(x1, y1) * fx;
-            out.push((top * (1.0 - fy) + bottom * fy) as f32);
-        }
-    }
+    let mut out = vec![0f32; width * height];
+    out.par_chunks_mut(width.max(1))
+        .zip(&ys)
+        .for_each(|(row, &(y0, y1, fy))| {
+            for (o, &(x0, x1, fx)) in row.iter_mut().zip(&xs) {
+                let v = |i: usize, j: usize| grid[j * columns + i];
+                let top = v(x0, y0) * (1.0 - fx) + v(x1, y0) * fx;
+                let bottom = v(x0, y1) * (1.0 - fx) + v(x1, y1) * fx;
+                *o = (top * (1.0 - fy) + bottom * fy) as f32;
+            }
+        });
     out
 }

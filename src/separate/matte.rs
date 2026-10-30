@@ -13,6 +13,7 @@ use super::filters::{components, dilate, erode, median, open, uniform};
 use super::grid::{fill_nearest, gaussian, resize};
 use super::stats::Stats;
 use crate::{Result, error};
+use rayon::prelude::*;
 use serde::Serialize;
 
 pub const TRANSIT_MIN: f32 = 0.003;
@@ -49,21 +50,18 @@ pub struct MatteReport {
 fn sky_background(level: &[f32], sky: &[bool], w: usize, h: usize) -> Result<Vec<f32>> {
     let c = BACKGROUND_CELL;
     let (gw, gh) = (w / c, h / c);
-    let mut cells = Vec::with_capacity(gw * gh);
-    let mut buf = Vec::with_capacity(c * c);
-    for j in 0..gh {
-        for i in 0..gw {
-            buf.clear();
-            for y in j * c..(j + 1) * c {
-                for x in i * c..(i + 1) * c {
-                    if sky[y * w + x] {
-                        buf.push(level[y * w + x]);
-                    }
-                }
-            }
-            cells.push((buf.len() >= c * c / 4).then(|| f64::from(super::stats::median(&mut buf))));
-        }
-    }
+    let cells: Vec<Option<f64>> = (0..gw * gh)
+        .into_par_iter()
+        .map(|k| {
+            let (i, j) = (k % gw, k / gw);
+            let mut buf: Vec<f32> = (j * c..(j + 1) * c)
+                .flat_map(|y| (i * c..(i + 1) * c).map(move |x| y * w + x))
+                .filter(|&q| sky[q])
+                .map(|q| level[q])
+                .collect();
+            (buf.len() >= c * c / 4).then(|| f64::from(super::stats::median(&mut buf)))
+        })
+        .collect();
     let filled = fill_nearest(&cells, gw, gh)
         .ok_or_else(|| error("matte: no sky cells to fit the sky background"))?;
     Ok(resize(&gaussian(&filled, gw, gh, 2.0, false), gw, gh, w, h))
@@ -80,21 +78,30 @@ fn brightness(
 ) -> Result<(f32, Vec<f32>, Vec<f32>)> {
     let background = sky_background(level, sky, w, h)?;
     let dark: Vec<bool> = (0..w * h)
+        .into_par_iter()
         .map(|p| !sky[p] && level[p] < 0.25 * background[p])
         .collect();
     let core = erode(&dark, w, h, 3);
-    let mut ground: Vec<f32> = (0..w * h).filter(|&p| core[p]).map(|p| level[p]).collect();
+    let mut ground: Vec<f32> = (0..w * h)
+        .into_par_iter()
+        .filter(|&p| core[p])
+        .map(|p| level[p])
+        .collect();
     if ground.is_empty() {
         return Err(error("matte: no dark foreground to set the ground level"));
     }
     let ground_level = super::stats::median(&mut ground);
     let root = (n as f32).sqrt();
-    let (mut alpha, mut noise) = (Vec::with_capacity(w * h), Vec::with_capacity(w * h));
-    for p in 0..w * h {
-        let span = (background[p] - ground_level).max(1e-3);
-        alpha.push(((level[p] - ground_level) / span).clamp(0.0, 1.0));
-        noise.push(1.2533 * sigma[p] / root / span);
-    }
+    let (alpha, noise) = (0..w * h)
+        .into_par_iter()
+        .map(|p| {
+            let span = (background[p] - ground_level).max(1e-3);
+            (
+                ((level[p] - ground_level) / span).clamp(0.0, 1.0),
+                1.2533 * sigma[p] / root / span,
+            )
+        })
+        .unzip();
     Ok((ground_level, alpha, noise))
 }
 
@@ -105,7 +112,7 @@ pub fn matte(stats: &Stats, frames: usize, labels: Option<&[u32]>) -> Result<Mat
     let seen = open(
         &stats
             .transit
-            .iter()
+            .par_iter()
             .map(|&t| t >= TRANSIT_MIN)
             .collect::<Vec<_>>(),
         w,
@@ -114,9 +121,15 @@ pub fn matte(stats: &Stats, frames: usize, labels: Option<&[u32]>) -> Result<Mat
     let level = &stats.low;
     let (_, alpha0, _) = brightness(level, &stats.sigma, frames, &seen, w, h)?;
     let mean = uniform(level, w, h, 5);
-    let squares = uniform(&level.iter().map(|v| v * v).collect::<Vec<_>>(), w, h, 5);
+    let squares = uniform(
+        &level.par_iter().map(|v| v * v).collect::<Vec<_>>(),
+        w,
+        h,
+        5,
+    );
     let root = (frames as f32).sqrt();
     let refit: Vec<bool> = (0..w * h)
+        .into_par_iter()
         .map(|p| {
             let texture = (squares[p] - mean[p] * mean[p]).max(0.0).sqrt();
             seen[p] || (alpha0[p] >= 0.85 && texture < 3.0 * 1.2533 * stats.sigma[p] / root)
@@ -124,17 +137,21 @@ pub fn matte(stats: &Stats, frames: usize, labels: Option<&[u32]>) -> Result<Mat
         .collect();
     let (ground_level, alpha, noise) = brightness(level, &stats.sigma, frames, &refit, w, h)?;
     let clear: Vec<bool> = (0..w * h)
+        .into_par_iter()
         .map(|p| {
             (alpha[p] >= 1.0 - 3.0 * noise[p] && noise[p] < 0.05) || (seen[p] && alpha[p] >= 0.85)
         })
         .collect();
-    let mut ground: Vec<bool> = (0..w * h).map(|p| alpha[p] <= 3.0 * noise[p]).collect();
+    let mut ground: Vec<bool> = (0..w * h)
+        .into_par_iter()
+        .map(|p| alpha[p] <= 3.0 * noise[p])
+        .collect();
     let gap = gaps(&seen, w, h);
     let near = near_transits(gap.as_deref(), &alpha, w, h);
     let lit = lit(stats, &seen, gap.as_deref());
-    for p in 0..w * h {
-        ground[p] |= (!near[p] && !clear[p] || lit[p]) && stats.resolvable[p];
-    }
+    ground.par_iter_mut().enumerate().for_each(|(p, g)| {
+        *g |= (!near[p] && !clear[p] || lit[p]) && stats.resolvable[p];
+    });
     let mut segments = 0;
     if let Some(labels) = labels {
         let count = labels.iter().copied().max().unwrap_or(0) as usize + 1;
@@ -160,6 +177,7 @@ pub fn matte(stats: &Stats, frames: usize, labels: Option<&[u32]>) -> Result<Mat
         }
     }
     let mut snapped: Vec<f32> = (0..w * h)
+        .into_par_iter()
         .map(|p| match (ground[p] && !seen[p], clear[p], ground[p]) {
             (true, _, _) => 0.0,
             (false, true, _) => 1.0,
@@ -168,12 +186,12 @@ pub fn matte(stats: &Stats, frames: usize, labels: Option<&[u32]>) -> Result<Mat
         })
         .collect();
     let local = median(&snapped, w, h, 5);
-    for p in 0..w * h {
-        if snapped[p] > 0.85 && local[p] >= 0.98 {
-            snapped[p] = 1.0;
+    snapped.par_iter_mut().zip(&local).for_each(|(s, &l)| {
+        if *s > 0.85 && l >= 0.98 {
+            *s = 1.0;
         }
-    }
-    let solid: Vec<bool> = snapped.iter().map(|&a| a <= 0.02).collect();
+    });
+    let solid: Vec<bool> = snapped.par_iter().map(|&a| a <= 0.02).collect();
     let (sizes, label) = components(&solid, w, h);
     let mut islands = 0;
     for p in 0..w * h {
@@ -184,14 +202,16 @@ pub fn matte(stats: &Stats, frames: usize, labels: Option<&[u32]>) -> Result<Mat
     }
     let near_transit = dilate(&seen, w, h, 3);
     let unstable: Vec<bool> = (0..w * h)
+        .into_par_iter()
         .map(|p| {
             snapped[p] <= 0.5
                 && !near_transit[p]
                 && stats.scatter[p] / stats.sigma[p].max(1e-3) > UNSTABLE_FACTOR
         })
         .collect();
-    let share =
-        |f: &dyn Fn(usize) -> bool| (0..w * h).filter(|&p| f(p)).count() as f64 / (w * h) as f64;
+    let count =
+        |f: &(dyn Fn(usize) -> bool + Sync)| (0..w * h).into_par_iter().filter(|&p| f(p)).count();
+    let share = |f: &(dyn Fn(usize) -> bool + Sync)| count(f) as f64 / (w * h) as f64;
     let report = MatteReport {
         ground_level,
         sky_clear_share: share(&|p| snapped[p] >= 0.98),
@@ -199,9 +219,9 @@ pub fn matte(stats: &Stats, frames: usize, labels: Option<&[u32]>) -> Result<Mat
         edge_share: share(&|p| snapped[p] > 0.02 && snapped[p] < 0.98),
         transit_seen_share: share(&|p| seen[p]),
         ground_islands_to_sky_pixels: islands,
-        conflict_pixels: (0..w * h).filter(|&p| seen[p] && snapped[p] < 0.2).count(),
-        unstable_pixels: unstable.iter().filter(|&&u| u).count(),
-        lit_pixels: lit.iter().filter(|&&l| l).count(),
+        conflict_pixels: count(&|p| seen[p] && snapped[p] < 0.2),
+        unstable_pixels: count(&|p| unstable[p]),
+        lit_pixels: count(&|p| lit[p]),
         segments,
     };
     Ok(Matte {

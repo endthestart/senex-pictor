@@ -5,6 +5,7 @@
 use super::filters::{dilate, distance_squared};
 use super::grid::{fill_nearest, gaussian, resize};
 use super::stats::{Stats, median, percentile};
+use rayon::prelude::*;
 
 pub const NEAR_RADIUS_PX: f64 = 6.0;
 pub const MAX_GAP_PX: f64 = 32.0;
@@ -17,7 +18,7 @@ const MIN_SKY_PIXELS: usize = 64;
 
 /// Distance in pixels from each pixel to the nearest transit; none without transits.
 pub fn gaps(seen: &[bool], w: usize, h: usize) -> Option<Vec<f64>> {
-    distance_squared(seen, w, h).map(|(d, _)| d.iter().map(|d| d.sqrt()).collect())
+    distance_squared(seen, w, h).map(|(d, _)| d.par_iter().map(|d| d.sqrt()).collect())
 }
 
 /// Per pixel a GAP_BLOCK grid's values (empty cells take the nearest cell's), bilinear.
@@ -31,7 +32,12 @@ fn spread(cells: &[Option<f64>], w: usize, h: usize, smooth: bool) -> Option<Vec
         filled
     };
     let up = resize(&grid, gw, gh, gw * b, gh * b);
-    Some((0..w * h).map(|p| up[(p / w) * gw * b + p % w]).collect())
+    Some(
+        (0..w * h)
+            .into_par_iter()
+            .map(|p| up[(p / w) * gw * b + p % w])
+            .collect(),
+    )
 }
 
 /// Per GAP_BLOCK block, `of` the `value`s of the pixels where `keep` holds, when at least
@@ -39,23 +45,24 @@ fn spread(cells: &[Option<f64>], w: usize, h: usize, smooth: bool) -> Option<Vec
 fn cells(
     (w, h): (usize, usize),
     least: usize,
-    keep: &dyn Fn(usize) -> bool,
-    value: &dyn Fn(usize) -> f32,
+    keep: &(dyn Fn(usize) -> bool + Sync),
+    value: &(dyn Fn(usize) -> f32 + Sync),
     of: fn(&mut [f32]) -> f32,
 ) -> Vec<Option<f64>> {
     let b = GAP_BLOCK;
-    let mut out = Vec::new();
-    for j in 0..h.div_ceil(b) {
-        for i in 0..w.div_ceil(b) {
+    let columns = w.div_ceil(b);
+    (0..columns * h.div_ceil(b))
+        .into_par_iter()
+        .map(|k| {
+            let (i, j) = (k % columns, k / columns);
             let mut v: Vec<f32> = (j * b..((j + 1) * b).min(h))
                 .flat_map(|y| (i * b..((i + 1) * b).min(w)).map(move |x| y * w + x))
                 .filter(|&p| keep(p))
                 .map(value)
                 .collect();
-            out.push((v.len() >= least).then(|| f64::from(of(&mut v))));
-        }
-    }
-    out
+            (v.len() >= least).then(|| f64::from(of(&mut v)))
+        })
+        .collect()
 }
 
 /// Whether each pixel lies within the local transit gap (the 99th-percentile gap over the
@@ -81,6 +88,7 @@ pub fn near_transits(gap: Option<&[f64]>, alpha: &[f32], w: usize, h: usize) -> 
         return vec![true; w * h];
     };
     (0..w * h)
+        .into_par_iter()
         .map(|p| {
             let r = f64::from(radius[p]).exp();
             gap[p] <= r || r > MAX_GAP_PX
@@ -104,13 +112,16 @@ pub fn lit(stats: &Stats, seen: &[bool], gap: Option<&[f64]>) -> Vec<bool> {
         return vec![false; w * h];
     };
     let apart: Vec<bool> = (0..w * h)
+        .into_par_iter()
         .map(|p| (stats.red[p] - red[p]).abs() + (stats.blue[p] - blue[p]).abs() >= LIT_COLOUR)
         .collect();
     let core: Vec<bool> = (0..w * h)
+        .into_par_iter()
         .map(|p| apart[p] && gap[p] > NEAR_RADIUS_PX)
         .collect();
     let around = dilate(&core, w, h, NEAR_RADIUS_PX as usize);
     (0..w * h)
+        .into_par_iter()
         .map(|p| apart[p] && !seen[p] && around[p])
         .collect()
 }
