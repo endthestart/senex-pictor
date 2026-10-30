@@ -198,9 +198,7 @@ pub fn hero(store: &Store, o: &Options, budget: &Budget) -> Result<Report> {
             })
         })
         .collect();
-    let glow_hero: Vec<[f32; 3]> = (0..w * h)
-        .map(|p| glow[hero].sample([(p % w) as f64, (p / w) as f64]))
-        .collect();
+    let glow_hero = glow[hero].full(w, h);
     let channel = |v: &[[f32; 3]], k: usize| v.iter().map(|c| c[k]).collect::<Vec<f32>>();
     planes::save(
         &store.dir.join(format!("{name}.planes")),

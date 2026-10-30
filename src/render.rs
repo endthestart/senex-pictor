@@ -5,6 +5,7 @@
 //! keeps the exposure it was shot with: sensor white is display white, sRGB-encoded.
 
 use crate::{Result, error};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 pub type Matrix = [[f64; 3]; 3];
@@ -118,7 +119,7 @@ pub fn linear(image: &[[f32; 3]], scene: &Scene, look: &Look) -> Vec<[f32; 3]> {
     let m = scene.matrix.map(|r| r.map(|v| v as f32));
     let lowest = scene.wb.iter().copied().fold(f32::INFINITY, f32::min);
     image
-        .iter()
+        .par_iter()
         .enumerate()
         .map(|(p, c)| {
             let a = scene.alpha[p];
@@ -144,7 +145,7 @@ pub fn linear(image: &[[f32; 3]], scene: &Scene, look: &Look) -> Vec<[f32; 3]> {
 /// and white scale.
 pub fn levels(rgb: &[[f32; 3]], clear: &[bool], look: &Look) -> Result<([f32; 3], f32)> {
     let sky: Vec<[f32; 3]> = rgb
-        .iter()
+        .par_iter()
         .zip(clear)
         .filter(|(_, c)| **c)
         .map(|(c, _)| *c)
@@ -153,9 +154,9 @@ pub fn levels(rgb: &[[f32; 3]], clear: &[bool], look: &Look) -> Result<([f32; 3]
         return Err(error("render: no clear sky to set levels"));
     }
     let luminance = |c: &[f32; 3]| c[0] * WEIGHTS[0] + c[1] * WEIGHTS[1] + c[2] * WEIGHTS[2];
-    let mut level: Vec<f32> = sky.iter().map(luminance).collect();
+    let mut level: Vec<f32> = sky.par_iter().map(luminance).collect();
     let cut = crate::separate::stats::percentile(&mut level.clone(), look.black_percentile);
-    let dark: Vec<&[f32; 3]> = sky.iter().filter(|c| luminance(c) <= cut).collect();
+    let dark: Vec<&[f32; 3]> = sky.par_iter().filter(|c| luminance(c) <= cut).collect();
     let black: [f32; 3] = std::array::from_fn(|k| {
         crate::separate::stats::median(&mut dark.iter().map(|c| c[k]).collect::<Vec<_>>())
     });
@@ -191,7 +192,7 @@ fn finish_to(
     top: f32,
 ) -> Vec<[f32; 3]> {
     let norm = look.stretch.asinh();
-    rgb.iter()
+    rgb.par_iter()
         .map(|c| {
             let d: [f32; 3] = std::array::from_fn(|k| c[k] - black[k]);
             let l = d[0] * WEIGHTS[0] + d[1] * WEIGHTS[1] + d[2] * WEIGHTS[2];
@@ -206,36 +207,23 @@ fn finish_to(
 
 /// The stretched sky and the as-shot foreground of linear sRGB `rgb`, blended by the scene's
 /// sky weight in display values.
-fn display(
+pub fn display(
     rgb: &[[f32; 3]],
     scene: &Scene,
-    black: [f32; 3],
-    scale: f32,
+    (black, scale): ([f32; 3], f32),
     look: &Look,
     top: f32,
-) -> Vec<[f32; 3]> {
-    finish_to(rgb, black, scale, look, top)
-        .iter()
+) -> Result<Vec<[f32; 3]>> {
+    if !(scene.white.is_finite() && scene.white > 0.0) {
+        return Err(error("render: the sensor white must be positive"));
+    }
+    Ok(finish_to(rgb, black, scale, look, top)
+        .into_par_iter()
         .zip(rgb)
         .zip(scene.alpha)
         .map(|((sky, c), &a)| {
             std::array::from_fn(|k| a * sky[k] + (1.0 - a) * encode(c[k] / scene.white))
         })
-        .collect()
-}
-
-/// Renderings of `images` with the levels of the first, so a stack and a single frame are
-/// judged on the same black and white points.
-pub fn compare(images: &[&[[f32; 3]]], scene: &Scene, look: &Look) -> Result<Vec<Vec<[f32; 3]>>> {
-    if !(scene.white.is_finite() && scene.white > 0.0) {
-        return Err(error("render: the sensor white must be positive"));
-    }
-    let rgbs: Vec<Vec<[f32; 3]>> = images.iter().map(|i| linear(i, scene, look)).collect();
-    let first = rgbs.first().ok_or_else(|| error("render: no images"))?;
-    let (black, scale) = levels(first, scene.clear, look)?;
-    Ok(rgbs
-        .iter()
-        .map(|r| display(r, scene, black, scale, look, 1.0))
         .collect())
 }
 
@@ -247,17 +235,10 @@ pub fn hdr(
     look: &Look,
     headroom: f32,
 ) -> Result<[Vec<[f32; 3]>; 2]> {
-    if !(scene.white.is_finite() && scene.white > 0.0) {
-        return Err(error("render: the sensor white must be positive"));
-    }
     let rgb = linear(image, scene, look);
-    let (black, scale) = levels(&rgb, scene.clear, look)?;
-    Ok([1.0, headroom].map(|top| {
-        display(&rgb, scene, black, scale, look, top)
-            .iter()
-            .map(|c| c.map(decode))
-            .collect()
-    }))
+    let levels = levels(&rgb, scene.clear, look)?;
+    let [sdr, hdr] = [1.0, headroom].map(|top| display(&rgb, scene, levels, look, top));
+    Ok([sdr?, hdr?].map(|d| d.into_par_iter().map(|c| c.map(decode)).collect()))
 }
 
 #[cfg(test)]

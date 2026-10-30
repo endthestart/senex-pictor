@@ -3,6 +3,7 @@
 
 use super::glow::BLOCK;
 use crate::stars::similarity::Point;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 /// RGB per BLOCK cell, row-major; NaN where unknown.
@@ -14,6 +15,14 @@ pub struct Grid {
 }
 
 impl Grid {
+    /// `sample` at every pixel of a `w`×`h` image, row-major.
+    pub fn full(&self, w: usize, h: usize) -> Vec<[f32; 3]> {
+        (0..w * h)
+            .into_par_iter()
+            .map(|p| self.sample([(p % w) as f64, (p / w) as f64]))
+            .collect()
+    }
+
     /// Bilinear value at a full-resolution position: positions within one cell of the grid
     /// edge take the edge value, farther ones and unknown neighbourhoods are NaN.
     pub fn sample(&self, p: Point) -> [f32; 3] {

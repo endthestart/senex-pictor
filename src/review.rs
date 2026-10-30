@@ -6,6 +6,7 @@ use crate::render::{self, Look, Matrix, Scene};
 use crate::separate::glow::CLEAR;
 use crate::store::{Store, planes};
 use crate::{Result, error, export};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -169,17 +170,14 @@ pub fn prepare(store: &Store, planes: &str, matrix: Option<&Path>) -> Result<Pre
         alpha.clone()
     };
     let clear: Vec<bool> = matte
-        .iter()
+        .par_iter()
         .zip(&transient)
         .map(|(&a, &t)| a >= CLEAR && t < 0.5)
         .collect();
     let glow = if hero {
         rgb_of(&result, "glow_")?
     } else {
-        let grids = crate::separate::load_glow(store)?;
-        (0..w * h)
-            .map(|p| grids[frame].sample([(p % w) as f64, (p / w) as f64]))
-            .collect()
+        crate::separate::load_glow(store)?[frame].full(w, h)
     };
     let flat = crate::integrate::recorded_flat(store)?;
     let xyz_to_camera = xyz_to_camera(store, matrix)?;
@@ -202,21 +200,27 @@ pub fn render(store: &Store, o: &Options) -> Result<Report> {
     let (frame, flat, clear, image) = (p.frame, &p.flat, &p.clear, &p.image);
     let w = store.manifest.width;
     let scene = p.scene();
-    let single: Vec<[f32; 3]> = store
-        .rgb_rows(frame, 0, h)?
-        .as_chunks::<3>()
-        .0
-        .iter()
-        .zip(flat)
-        .map(|(c, f)| c.map(|v| v / f))
-        .collect();
-    let mut images: Vec<&[[f32; 3]]> = vec![image];
-    if o.single {
-        images.push(&single);
-    }
+    let single: Option<Vec<[f32; 3]>> = o
+        .single
+        .then(|| -> Result<_> {
+            Ok(store
+                .rgb_rows(frame, 0, h)?
+                .as_chunks::<3>()
+                .0
+                .iter()
+                .zip(flat)
+                .map(|(c, f)| c.map(|v| v / f))
+                .collect())
+        })
+        .transpose()?;
     let lin = render::linear(image, &scene, &o.look);
     let (black, scale) = render::levels(&lin, clear, &o.look)?;
-    let shown = render::compare(&images, &scene, &o.look)?;
+    // The single frame takes the stack's levels, so both are judged on the same points.
+    let mut shown = vec![render::display(&lin, &scene, (black, scale), &o.look, 1.0)?];
+    if let Some(single) = &single {
+        let lin = render::linear(single, &scene, &o.look);
+        shown.push(render::display(&lin, &scene, (black, scale), &o.look, 1.0)?);
+    }
     let mut files = Vec::new();
     let stem = o.out.to_string_lossy().into_owned();
     let description = serde_json::to_string(
