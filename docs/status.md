@@ -41,6 +41,13 @@ HDR output, settings, menu bar, side-by-side results).
   metadata) decode to HDR in macOS ImageIO. App: Settings (GPU, memory, output folder), macOS
   menu bar, Compare B from another result of the run, HDR preview. GPU stack bands now stay
   within the device's buffer limit. Validated on all five owner sequences; UI by headless renders.
+  Later the same night: moving foliage keeps the long exposure's blur by default, as the owner
+  decided (it had always taken the reference minutes); sharp is a per-photo choice recorded in
+  the run (`--moving sharp`, `recompose`, Scene's switch). Sky & ground lists the regions the
+  colour check made ground. The sequence check is a quarter faster with identical output (BWCA
+  591 files: 86 s → 65 s); ingest and store reads use less CPU with byte-identical stores, but
+  ingest here is bound by the data volume's writes (133 MB/s, 92% full). Recent folders, a
+  packaging script (`tools/package-macos.sh`) and Linux/Windows compile checks.
 - Desktop app, all six steps (2026-10-27): Import checks a RAW folder in the background
   (thumbnails made during the sequence check), chooses runs and frames, checks lens profile,
   colour matrix, memory and disk before writing, and runs `process` with live progress, time
