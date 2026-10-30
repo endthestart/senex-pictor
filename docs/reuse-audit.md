@@ -45,7 +45,7 @@ patch (an `Rgba16Float` extended-linear-sRGB surface and egui drawn at SDR white
 `[patch.crates-io]`; licence texts are in that folder. The app's typeface is Inter 4
 (Regular and SemiBold, SIL OFL 1.1) copied from LightCraft's `assets/fonts/` with its licence
 (`app/assets/fonts/OFL-Inter.txt`; SHA-256 40d692fc… Regular, 78a843fa… SemiBold). The app
-reads treatment previews with `image` 0.25 (MIT/Apache-2.0, JPEG decoding only).
+reads treatment previews with `image` 0.25 (MIT/Apache-2.0, JPEG decoding only). On macOS the menu bar comes from `muda` 0.21 (MIT/Apache-2.0).
 
 Source files are copied verbatim from the pinned upstream commit. The subset workspace
 Cargo.toml is adapted to expose only these crates and their dependency declarations.

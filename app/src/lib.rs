@@ -3,11 +3,14 @@
 
 pub mod app;
 pub mod bench;
+mod commands;
 mod compare;
 mod display;
 pub mod gpu;
 mod import;
 mod job;
+#[cfg(target_os = "macos")]
+mod menu;
 mod opening;
 pub mod project;
 mod rows;

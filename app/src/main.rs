@@ -148,6 +148,7 @@ fn run(args: Vec<String>) -> Result<()> {
         device,
         bench_seconds: o.get("--bench-window").map(|v| v.parse()).transpose()?,
         screenshot: o.get("--screenshot").map(PathBuf::from),
+        menu: true,
     };
     let icon = image::load_from_memory(include_bytes!("../assets/icon/pictor.png"))?.into_rgba8();
     let icon = egui::IconData {

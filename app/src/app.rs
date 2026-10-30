@@ -33,6 +33,8 @@ pub struct Start {
     pub device: wgpu::Device,
     pub bench_seconds: Option<f64>,
     pub screenshot: Option<PathBuf>,
+    /// Installs the macOS menu bar (not in headless tests, which have no application).
+    pub menu: bool,
 }
 
 pub struct Pictor {
@@ -50,7 +52,9 @@ pub struct Pictor {
     pub(crate) bench: Option<crate::bench::Window>,
     shot: Option<crate::shot::Shot>,
     pub(crate) settings: Settings,
-    settings_window: crate::settings::Window,
+    pub(crate) settings_window: crate::settings::Window,
+    #[cfg(target_os = "macos")]
+    pub(crate) menu: Option<crate::menu::NativeMenu>,
 }
 
 /// The header's memory chip for `settings`.
@@ -108,7 +112,16 @@ impl Pictor {
             bench: s.bench_seconds.map(crate::bench::Window::new),
             settings,
             settings_window: Default::default(),
+            #[cfg(target_os = "macos")]
+            menu: None,
         };
+        #[cfg(target_os = "macos")]
+        if s.menu {
+            match crate::menu::NativeMenu::install(&cc.egui_ctx) {
+                Ok(m) => app.menu = Some(m),
+                Err(e) => eprintln!("pictor: no menu bar ({e})"),
+            }
+        }
         app.error = settings_error;
         if rs.is_none() {
             app.error = Some("the window did not start with wgpu".into());
@@ -231,9 +244,11 @@ impl eframe::App for Pictor {
             .frame(egui::Frame::NONE)
             .show(ui, |ui| shell::header(ui, &name, &chips))
             .inner;
-        if clicked || ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::Comma)) {
+        if clicked {
             self.settings_window.open(self.settings.clone());
         }
+        let steps = rows::steps(self);
+        self.commands(&ctx, &steps);
         if let Some(saved) = self.settings_window.show(&ctx) {
             self.chips[0] = memory_chip(&saved);
             self.settings = saved.clone();
@@ -243,24 +258,6 @@ impl eframe::App for Pictor {
         egui::Panel::bottom("status")
             .frame(egui::Frame::NONE)
             .show(ui, |ui| shell::footer(ui, icon, &status));
-        let steps = rows::steps(self);
-        let pressed = ctx.input(|i| {
-            let keys = [
-                egui::Key::Num1,
-                egui::Key::Num2,
-                egui::Key::Num3,
-                egui::Key::Num4,
-                egui::Key::Num5,
-                egui::Key::Num6,
-            ];
-            keys.iter()
-                .position(|k| i.modifiers.command && i.key_pressed(*k))
-        });
-        if let Some(row) = pressed.and_then(|k| steps.get(k))
-            && row.state != shell::State::Unavailable
-        {
-            self.step = row.step;
-        }
         egui::Panel::left("steps")
             .exact_size(240.0)
             .resizable(false)

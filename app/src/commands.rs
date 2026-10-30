@@ -1,0 +1,83 @@
+//! What the owner asks for beyond the current screen, from the keyboard or the menu bar:
+//! Settings (⌘,), Open Folder (⌘O), a step (⌘1–⌘6) and, from the menu, the zoom (its keys, F, 1
+//! and 2, reach the viewer directly).
+
+use crate::app::{Pictor, Workspace};
+use crate::shell::{State, Step, StepRow};
+use crate::viewer::Zoom;
+use egui::{Key, Modifiers};
+
+/// A command the keyboard or the menu bar gave.
+pub enum Command {
+    Open,
+    Settings,
+    Step(Step),
+    Fit,
+    Zoom(f32),
+}
+
+fn keyboard(ctx: &egui::Context) -> Vec<Command> {
+    let digits = [
+        Key::Num1,
+        Key::Num2,
+        Key::Num3,
+        Key::Num4,
+        Key::Num5,
+        Key::Num6,
+    ];
+    ctx.input_mut(|i| {
+        let mut out = Vec::new();
+        if i.consume_key(Modifiers::COMMAND, Key::Comma) {
+            out.push(Command::Settings);
+        }
+        if i.consume_key(Modifiers::COMMAND, Key::O) {
+            out.push(Command::Open);
+        }
+        for (key, step) in digits.into_iter().zip(Step::ALL) {
+            if i.consume_key(Modifiers::COMMAND, key) {
+                out.push(Command::Step(step));
+            }
+        }
+        out
+    })
+}
+
+impl Pictor {
+    /// Carries out the keyboard's and the menu bar's commands; `steps` are the step list's rows.
+    pub(crate) fn commands(&mut self, ctx: &egui::Context, steps: &[StepRow]) {
+        #[allow(unused_mut)]
+        let mut chosen = keyboard(ctx);
+        #[cfg(target_os = "macos")]
+        if let Some(menu) = &self.menu {
+            chosen.extend(menu.commands());
+        }
+        for c in chosen {
+            match c {
+                Command::Settings => self.settings_window.open(self.settings.clone()),
+                Command::Open => {
+                    if self.idle()
+                        && let Some(dir) = rfd::FileDialog::new().pick_folder()
+                    {
+                        self.open(dir);
+                    }
+                }
+                Command::Step(step) => {
+                    if steps
+                        .iter()
+                        .any(|r| r.step == step && r.state != State::Unavailable)
+                    {
+                        self.step = step;
+                    }
+                }
+                Command::Fit | Command::Zoom(_) => {
+                    if let Workspace::Open(s) = &mut self.workspace {
+                        s.viewer.zoom = match c {
+                            Command::Zoom(z) => Zoom::Factor(z),
+                            _ => Zoom::Fit,
+                        };
+                    }
+                }
+            }
+        }
+    }
+}
