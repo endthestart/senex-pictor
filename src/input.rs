@@ -78,6 +78,16 @@ pub fn decode(path: &Path) -> Result<(RawImage, Identity)> {
     Ok((lcc_raw::decode(&bytes)?, identity))
 }
 
+/// The file decoded with its name, without hashing it (the sequence check needs no identity).
+pub fn decode_named(path: &Path) -> Result<(RawImage, String)> {
+    let name = path
+        .file_name()
+        .ok_or_else(|| error("input has no filename"))?
+        .to_string_lossy()
+        .into_owned();
+    Ok((lcc_raw::decode(&std::fs::read(path)?)?, name))
+}
+
 /// Decoded sensor levels and geometry, for comparison against camera databases.
 #[derive(Debug, Serialize)]
 pub struct Levels {

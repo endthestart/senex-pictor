@@ -213,3 +213,42 @@ fn saturation_is_flagged_from_stored_values() -> Result<()> {
     );
     Ok(())
 }
+
+#[test]
+fn the_plane_above_black_matches_the_black_level_site_by_site() -> Result<()> {
+    let sensor = Sensor::new();
+    let scene = dark_scene(1.0);
+    let mut rng = Rng::new(9);
+    let mut mosaic = mosaic(expose(&sensor, &scene, &mut rng), &scene)?;
+    mosaic.black.repeat_rows = 2;
+    mosaic.black.repeat_cols = 2;
+    mosaic.black.values = vec![600.25, 601.5, 599.75, 602.0];
+    mosaic.black.delta_h = (0..mosaic.width).map(|x| (x % 7) as f32 * 0.37).collect();
+    mosaic.black.delta_v = (0..mosaic.height).map(|y| (y % 5) as f32 * -0.21).collect();
+    let crop = (3, 5, mosaic.width - 7, mosaic.height - 9);
+    let plane = mosaic.plane_above_black(crop);
+    let (cx, cy, cw, ch) = crop;
+    for y in 0..ch {
+        for x in 0..cw {
+            let (ax, ay) = (cx + x, cy + y);
+            let want = mosaic.data[ay * mosaic.width + ax] - mosaic.black.at(ax, ay, 0, 1);
+            assert_eq!(
+                plane[y * cw + x].to_bits(),
+                want.to_bits(),
+                "site ({ax}, {ay})"
+            );
+        }
+    }
+    let colours = mosaic.colours(crop);
+    for y in 0..ch {
+        for x in 0..cw {
+            let want = mosaic.cfa.color_at(cx + x, cy + y);
+            assert_eq!(
+                colours[(cy + y) % colours.len()][x],
+                want,
+                "colour at ({x}, {y})"
+            );
+        }
+    }
+    Ok(())
+}

@@ -2,7 +2,6 @@
 //! on star-free half-resolution luminance of its lower half, and the stars' similarity step,
 //! from triangle matching of the brightest stars of the upper half.
 
-use crate::calibration::Mosaic;
 use crate::flow::{self, Gray, Pyramid};
 use crate::stars::similarity::{Point, Random};
 use crate::stars::{detect, triangles};
@@ -43,15 +42,8 @@ impl Steps {
 }
 
 /// The look of a RAW mosaic's default crop: 2×2 site sums above black.
-pub fn look(mosaic: &Mosaic, crop: (usize, usize, usize, usize)) -> crate::Result<Look> {
-    let (cx, cy, cw, ch) = crop;
-    let above: Vec<f32> = (0..cw * ch)
-        .map(|i| {
-            let (x, y) = (cx + i % cw, cy + i / cw);
-            mosaic.data[y * mosaic.width + x] - mosaic.black.at(x, y, 0, 1)
-        })
-        .collect();
-    let (half, w, h) = flow::half_sums(&above, cw, ch);
+pub fn look(above: &[f32], (cw, ch): (usize, usize)) -> crate::Result<Look> {
+    let (half, w, h) = flow::half_sums(above, cw, ch);
     let upper = &half[..w * (h / 2)];
     let found = detect(upper, &vec![false; upper.len()], w, h / 2)?;
     let mut order: Vec<usize> = (0..found.len()).collect();

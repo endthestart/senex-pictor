@@ -44,6 +44,43 @@ impl Mosaic {
         Ok(mosaic)
     }
 
+    /// The samples of `crop` (x, y, width, height) above their black level, row by row: the
+    /// same values as subtracting `black.at` per site, with the black of each column worked out
+    /// once per row of the black pattern.
+    pub fn plane_above_black(&self, (cx, cy, cw, ch): (usize, usize, usize, usize)) -> Vec<f32> {
+        let b = &self.black;
+        let (r, c) = (b.repeat_rows.max(1), b.repeat_cols.max(1));
+        let columns: Vec<Vec<f32>> = (0..r)
+            .map(|pr| {
+                (cx..cx + cw)
+                    .map(|x| {
+                        let base = b
+                            .values
+                            .get(pr * c + x % c)
+                            .or_else(|| b.values.first())
+                            .copied()
+                            .unwrap_or(0.0);
+                        base + b.delta_h.get(x).copied().unwrap_or(0.0)
+                    })
+                    .collect()
+            })
+            .collect();
+        let mut out = Vec::with_capacity(cw * ch);
+        for y in cy..cy + ch {
+            let (row, dv) = (&columns[y % r], b.delta_v.get(y).copied().unwrap_or(0.0));
+            let data = &self.data[y * self.width + cx..y * self.width + cx + cw];
+            out.extend(data.iter().zip(row).map(|(v, black)| v - (black + dv)));
+        }
+        out
+    }
+
+    /// The colour of each column of `crop` in each row of the CFA pattern.
+    pub fn colours(&self, (cx, _, cw, _): (usize, usize, usize, usize)) -> Vec<Vec<u8>> {
+        (0..self.cfa.height)
+            .map(|pr| (cx..cx + cw).map(|x| self.cfa.color_at(x, pr)).collect())
+            .collect()
+    }
+
     pub fn validate(&self) -> Result<()> {
         let sites = self
             .width

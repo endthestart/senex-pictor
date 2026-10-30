@@ -46,7 +46,7 @@ const CAPTURE_BYTES_PER_PIXEL: u64 = 40;
 const LOOK_BYTES_PER_PIXEL: u64 = 1;
 
 pub fn capture(path: &Path) -> Result<(Capture, Look, Thumb)> {
-    let (raw, identity) = input::decode(path)?;
+    let (raw, name) = input::decode_named(path)?;
     let mosaic = Mosaic::from_raw(&raw)?;
     let crop = raw.develop_crop(mosaic.width, mosaic.height);
     let m = &raw.metadata;
@@ -54,12 +54,13 @@ pub fn capture(path: &Path) -> Result<(Capture, Look, Thumb)> {
         .capture_time
         .as_ref()
         .map(seconds)
-        .ok_or_else(|| error(format!("{}: no capture time", identity.filename)))?;
+        .ok_or_else(|| error(format!("{name}: no capture time")))?;
     let at = |x: usize, y: usize| (crop.x + x, crop.y + y);
-    let above = |x: usize, y: usize| {
-        let (ax, ay) = at(x, y);
-        mosaic.data[ay * mosaic.width + ax] - mosaic.black.at(ax, ay, 0, 1)
-    };
+    let area = (crop.x, crop.y, crop.width, crop.height);
+    let plane = mosaic.plane_above_black(area);
+    let colours = mosaic.colours(area);
+    let above = |x: usize, y: usize| plane[y * crop.width + x];
+    let colour = |x: usize, y: usize| colours[(crop.y + y) % colours.len()][x];
     let (w, h) = (crop.width / 2 * 2, crop.height / 2 * 2);
     let mut saturated = 0usize;
     for y in 0..crop.height {
@@ -68,28 +69,33 @@ pub fn capture(path: &Path) -> Result<(Capture, Look, Thumb)> {
             saturated += usize::from(mosaic.data[ay * mosaic.width + ax] >= mosaic.white);
         }
     }
-    let mut sky: Vec<f32> = (0..h / 4)
-        .flat_map(|j| (0..w / 2).map(move |i| (2 * i, 2 * j)))
-        .map(|(x, y)| above(x, y) + above(x + 1, y) + above(x, y + 1) + above(x + 1, y + 1))
-        .collect();
+    let mut sky = Vec::with_capacity(h / 4 * (w / 2));
+    for j in 0..h / 4 {
+        for i in 0..w / 2 {
+            let (x, y) = (2 * i, 2 * j);
+            sky.push(above(x, y) + above(x + 1, y) + above(x, y + 1) + above(x + 1, y + 1));
+        }
+    }
     let mut ground: [Vec<f32>; 3] = Default::default();
     for y in h / 2..h {
         for x in 0..w {
-            let (ax, ay) = at(x, y);
-            ground[usize::from(mosaic.cfa.color_at(ax, ay))].push(above(x, y));
+            ground[usize::from(colour(x, y))].push(above(x, y));
         }
     }
-    let look = motion::look(&mosaic, (crop.x, crop.y, crop.width, crop.height))?;
+    let look = motion::look(&plane, (crop.width, crop.height))?;
     let wb = raw
         .wb_multipliers
-        .ok_or_else(|| error(format!("{}: no as-shot white balance", identity.filename)))?;
+        .ok_or_else(|| error(format!("{name}: no as-shot white balance")))?;
+    let range = f64::from(mosaic.white) - f64::from(mosaic.black.at(crop.x, crop.y, 0, 1));
     let thumb = thumb::make(
-        &mosaic,
-        (crop.x, crop.y, crop.width, crop.height),
+        &plane,
+        (crop.width, crop.height),
+        (&colours, crop.y),
+        range,
         [wb[0] / wb[1], 1.0, wb[2] / wb[1]],
     )?;
     let capture = Capture {
-        name: identity.filename,
+        name,
         time_s,
         settings: Settings {
             make: m.make.clone(),

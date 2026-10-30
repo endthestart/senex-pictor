@@ -2,7 +2,6 @@
 //! app can show every frame of a folder before anything is processed: camera RGB above black,
 //! scaled to the white level, as-shot white balance applied, box-averaged per colour.
 
-use crate::calibration::Mosaic;
 use crate::{Result, error};
 use half::f16;
 
@@ -24,24 +23,31 @@ pub fn size(w: usize, h: usize) -> (usize, usize) {
     (side(w), side(h))
 }
 
-/// The thumbnail of `mosaic`'s `crop` (x, y, width, height) with white balance `wb`.
-pub fn make(mosaic: &Mosaic, crop: (usize, usize, usize, usize), wb: [f32; 3]) -> Result<Thumb> {
-    let (cx, cy, cw, ch) = crop;
+/// The thumbnail of a crop's samples `above` black (`cw` × `ch`, row by row), whose colours
+/// are `colours` per row of the CFA pattern (row `first_row` of the crop is pattern row
+/// `first_row % colours.len()`), scaled by the white level's `range` above black, with white
+/// balance `wb`.
+pub fn make(
+    above: &[f32],
+    (cw, ch): (usize, usize),
+    (colours, first_row): (&[Vec<u8>], usize),
+    range: f64,
+    wb: [f32; 3],
+) -> Result<Thumb> {
     let (tw, th) = size(cw, ch);
     let mut sums = vec![[0f64; 3]; tw * th];
     let mut counts = vec![[0u32; 3]; tw * th];
+    let cells: Vec<usize> = (0..cw).map(|x| x * tw / cw).collect();
     for y in 0..ch {
         let row = (y * th / ch) * tw;
-        for x in 0..cw {
-            let (ax, ay) = (cx + x, cy + y);
-            let k = usize::from(mosaic.cfa.color_at(ax, ay));
-            let black = mosaic.black.at(ax, ay, 0, 1);
-            let cell = row + x * tw / cw;
-            sums[cell][k] += f64::from(mosaic.data[ay * mosaic.width + ax] - black);
+        let pattern = &colours[(first_row + y) % colours.len()];
+        let samples = &above[y * cw..(y + 1) * cw];
+        for ((&v, &k), &cell) in samples.iter().zip(pattern).zip(&cells) {
+            let (cell, k) = (row + cell, usize::from(k));
+            sums[cell][k] += f64::from(v);
             counts[cell][k] += 1;
         }
     }
-    let range = f64::from(mosaic.white) - f64::from(mosaic.black.at(cx, cy, 0, 1));
     if range <= 0.0 {
         return Err(error("white level at or below black"));
     }
