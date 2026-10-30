@@ -241,11 +241,11 @@ fn the_plane_above_black_matches_the_black_level_site_by_site() -> Result<()> {
     }
     let colours = mosaic.colours(crop);
     for y in 0..ch {
-        for x in 0..cw {
-            let want = mosaic.cfa.color_at(cx + x, cy + y);
+        let row = &colours[(cy + y) % colours.len()];
+        for (x, &got) in row.iter().enumerate() {
             assert_eq!(
-                colours[(cy + y) % colours.len()][x],
-                want,
+                got,
+                mosaic.cfa.color_at(cx + x, cy + y),
                 "colour at ({x}, {y})"
             );
         }
