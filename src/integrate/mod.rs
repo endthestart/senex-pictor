@@ -160,26 +160,6 @@ pub fn stack(store: &Store, o: &Options, budget: &Budget) -> Result<Report> {
             ("r", &channel(&sky.rgb, 0)),
             ("g", &channel(&sky.rgb, 1)),
             ("b", &channel(&sky.rgb, 2)),
-            (
-                "kept_r",
-                &sky.kept.iter().map(|k| k[0] as f32).collect::<Vec<_>>(),
-            ),
-            (
-                "kept_g",
-                &sky.kept.iter().map(|k| k[1] as f32).collect::<Vec<_>>(),
-            ),
-            (
-                "kept_b",
-                &sky.kept.iter().map(|k| k[2] as f32).collect::<Vec<_>>(),
-            ),
-            ("even_r", &channel(&sky.halves[0], 0)),
-            ("even_g", &channel(&sky.halves[0], 1)),
-            ("even_b", &channel(&sky.halves[0], 2)),
-            ("odd_r", &channel(&sky.halves[1], 0)),
-            ("odd_g", &channel(&sky.halves[1], 1)),
-            ("odd_b", &channel(&sky.halves[1], 2)),
-            ("clipped", &planes::bools(&sky.clipped)),
-            ("missing", &planes::bools(&missing)),
         ],
     )?;
     planes::save(
