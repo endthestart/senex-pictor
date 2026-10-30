@@ -59,7 +59,7 @@ pub fn show(ui: &mut Ui, ctx: &egui::Context, s: &mut Session, step: Step) {
         Step::Sky => {
             sky::keys(ctx, s);
             s.viewer.zoom_keys(ctx);
-            side(ui, |ui| s.sky.panel(ui, s.run.as_ref()));
+            side(ui, |ui| s.sky.panel(ui, &mut s.viewer, s.run.as_ref()));
             canvas(ui, |ui| s.sky.show(ui, &mut s.viewer));
         }
         Step::Scene => scrolling(ui, |ui| scene::show(ui, s)),

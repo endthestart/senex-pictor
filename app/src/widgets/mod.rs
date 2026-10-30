@@ -234,3 +234,20 @@ pub fn bytes(b: f64) -> String {
         format!("{:.0} MB", b / 1e6)
     }
 }
+
+/// A pixel count: "1.2 MP", or "45,300 px" below a megapixel.
+pub fn pixels(n: usize) -> String {
+    if n >= 1_000_000 {
+        format!("{:.1} MP", n as f64 / 1e6)
+    } else {
+        let digits = n.to_string();
+        let mut out = String::new();
+        for (k, c) in digits.chars().enumerate() {
+            if k > 0 && (digits.len() - k).is_multiple_of(3) {
+                out.push(',');
+            }
+            out.push(c);
+        }
+        format!("{out} px")
+    }
+}

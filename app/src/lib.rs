@@ -24,6 +24,6 @@ mod stats;
 mod synthetic;
 mod theme;
 mod thumbs;
-mod viewer;
+pub mod viewer;
 mod welcome;
 mod widgets;

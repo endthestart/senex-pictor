@@ -69,6 +69,7 @@ impl Session {
     /// Advances background work on this result.
     pub fn poll(&mut self, ctx: &egui::Context) {
         self.frames.poll(ctx);
+        self.sky.review.poll();
         self.scene.poll_preview(ctx);
         if let Some(run) = &self.run
             && let Some(made) = self.scene.poll(&run.out)
@@ -88,6 +89,7 @@ impl Session {
     pub fn busy(&self) -> bool {
         self.scene.making.is_some()
             || self.sky.applying.is_some()
+            || self.sky.review.reading()
             || self.compare.loading()
             || self.scene.loading()
             || self.look.exporting()

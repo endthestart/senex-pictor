@@ -377,3 +377,33 @@ fn compare_shows_another_result_of_the_run_in_b() -> Result<()> {
     assert!(key.ends_with(&other), "B should show {other}, not {key}");
     Ok(())
 }
+
+/// Sky & ground lists the regions the colour check made ground, and Show zooms to one with
+/// them tinted (`PICTOR_UI_CORRECT`, a run whose matte keeps them; skipped without it).
+#[test]
+fn show_zooms_to_a_region_the_colour_check_made_ground() -> Result<()> {
+    let Ok(folder) = std::env::var("PICTOR_UI_CORRECT") else {
+        eprintln!("PICTOR_UI_CORRECT is not set; skipped");
+        return Ok(());
+    };
+    let mut h = harness(Some(PathBuf::from(folder)), None);
+    wait(&mut h, 300, Pictor::opened)?;
+    h.state_mut().show_step(Step::Sky);
+    wait(&mut h, 60, Pictor::idle)?;
+    let Some(show) = h.query_all_by_label("Show").next() else {
+        return Err(error("no regions listed"));
+    };
+    show.click();
+    h.step();
+    h.step();
+    let shown = h
+        .state()
+        .session()
+        .map(|s| (s.sky.review.show, s.viewer.zoom));
+    assert!(
+        matches!(shown, Some((true, pictor::viewer::Zoom::Factor(_)))),
+        "Show should tint the regions and zoom in"
+    );
+    save(&h.render().map_err(error)?, "sky-region.jpg")?;
+    Ok(())
+}
