@@ -1,7 +1,7 @@
 # Implementation status
 
-Updated: 2026-10-29 (renamed Pictor; star cores, colour fringes, lit foliage, matte corrections,
-HDR output, settings, menu bar, side-by-side results).
+Updated: 2026-11-01 (closing point for the owner's cleanup week; one-page summary in
+[STATUS](../STATUS.md)).
 
 ## Milestone gates
 
@@ -11,8 +11,8 @@ HDR output, settings, menu bar, side-by-side results).
 | M1 RAW pipeline | Diagnostic slice plus calibration core | Camera-RGB export; calibration library with synthetic-truth tests; no end-to-end calibration, characterization or real calibration validation. |
 | M2 Registration/integration | Rust port R1–R7 done; lateral chromatic aberration measured from the stars | Fixed-axis and drift models, CFA stack (CPU and GPU) on the five owner sequences; PSF, photometry and colour gates not run. |
 | M3 Foreground/compositing | Partial | Matte from star transits, brightness and colour; owner corrections; long exposure, hero frame and moment composites. Lamp-lit swaying foliage looking straight up (Maplewood) still needs corrections. |
-| M4 Guided desktop app | In progress | Six steps, corrections, Settings, menu bar, side-by-side results, HDR preview and export; verified in headless renders only, not yet in a live window or by independent users. |
-| M5 Acceleration | Started | GPU sky stack (wgpu) with CPU fallback; no profiling-led work yet. |
+| M4 Guided desktop app | In progress | Six steps, corrections, Settings, menu bar, side-by-side results, HDR preview and export; verified in headless renders; the owner has opened it on a laptop but not yet run the steps by hand; no independent users. |
+| M5 Acceleration | Started | GPU sky stack (wgpu) with CPU fallback; profiling-led speed-ups on the CPU path, outputs byte-identical (Completed below). |
 | M6–M7 | Planned | No automation work or public release yet. |
 
 ## Completed
@@ -27,6 +27,8 @@ HDR output, settings, menu bar, side-by-side results).
   provenance report. 18 synthetic-truth tests; deliberate faults caught. Not in the CLI.
 - Two-phase plan: Phase 1 core sky/foreground logic first, Phase 2 decoder and
   calibration hardening ([plan](plan.md)); installs logged in [install-log](install-log.md).
+- HDR bracket prototype (2026-10-30), parked: `tools/proto/hdr.py` merges a RAW exposure bracket
+  around a reference frame; findings in the suite roadmap. Not part of the app.
 - SENEX family design (2026-10-30), agreed with the Corvus session and approved by the owner:
   theme follows [DESIGN-TOKENS](DESIGN-TOKENS.md) v1 (a test checks it), icon redrawn from
   the shared template with the Painter's Easel, About "© 2026 Michael Anderson", Third-Party
@@ -228,9 +230,11 @@ No complete dark/flat/bias calibration, shared development recipe, camera
 characterization, color-managed master export, TIFF input, PSF/photometry study or
 distribution audit. Licence: MIT OR Apache-2.0 (owner decision, 2026-10-29).
 Decoder-provided defaults versus explicitly recorded camera values need deeper audit.
-Current diagnostics are not release-quality photographic outputs.
+`develop`'s diagnostics are not release-quality photographic outputs.
 
 ## Next bounded work
+
+No new work during the cleanup week. First release gates are in [STATUS](../STATUS.md). After that:
 
 1. Re-audit the RAW decoder choice under ADR 0007 (LibRaw, rawler, LightCraft;
    Classic is now 08f7526c8); guard truncated packed NEFs, which Classic zero-fills.
@@ -238,9 +242,9 @@ Current diagnostics are not release-quality photographic outputs.
 2. End-to-end calibration path: vendor maker-note fields (NR, shutter, temperature),
    bounded-memory master loading, calibration before demosaic.
 3. Cross-check calibration against Siril or ccdproc on the Canon sets.
-3. Define shared white balance and characterization provenance, with explicit missing
+4. Define shared white balance and characterization provenance, with explicit missing
    profile behavior; write the color/master-format ADR before public master output.
-4. Measure stellar PSFs and color/flux behavior of demosaic alternatives on held-out
+5. Measure stellar PSFs and color/flux behavior of demosaic alternatives on held-out
    scenes; investigate memory peaks before scaling simultaneous frame work.
 
 The Python POC and prior outputs remain temporarily as private comparison evidence;

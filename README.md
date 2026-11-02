@@ -7,11 +7,12 @@ Taking over development? Read the [agent handoff](docs/HANDOFF.md) first.
 
 Start with [the planning index](docs/README.md), [requirements](docs/requirements.md),
 [milestone plan](docs/plan.md), and [current status](docs/status.md).
+[STATUS](STATUS.md) is the one-page closing note: what is done, what the data is, what waits on whom.
 
-## Current native slice
+## What it does
 
-Headless RAW inspection and full-resolution camera-RGB development. Outputs are
-diagnostics, not calibrated/color-managed public masters. No stacking or UI yet.
+`inspect` and `develop` give headless RAW inspection and full-resolution camera-RGB
+development. Their outputs are diagnostics, not calibrated/color-managed public masters.
 No white balance, standard-space conversion, dark/flat/bias correction, tone mapping,
 denoising, sharpening or lens resampling is performed by this path.
 Sensor-stage opcodes and non-square sensor resampling are explicitly rejected;
@@ -50,8 +51,10 @@ after `tools/notices.sh` refreshes the Third-Party Notices with `cargo about`.
 `.venv/bin/python tools/icon.py app/assets/icon` redraws the icon from the template in
 [DESIGN-TOKENS](docs/DESIGN-TOKENS.md), the look shared with SENEX Corvus.
 `cargo test -p pictor` renders the window headlessly (`PICTOR_UI_SHOTS=DIR`
-saves the frames; `PICTOR_UI_FOLDER`, `PICTOR_UI_RAW` and `PICTOR_UI_STOPPED`
-point the screen tests at a processed folder, a RAW folder and a stopped run).
+saves the frames; `PICTOR_UI_FOLDER`, `PICTOR_UI_RAW`, `PICTOR_UI_STOPPED`, `PICTOR_UI_CORRECT`
+and `PICTOR_UI_STACKED` point the screen tests at a processed folder, a RAW folder, a stopped
+run, a run the tests change and a folder with a whole-sequence stack; each is skipped without).
+`tools/proto/hdr.py` is a parked prototype that merges a RAW exposure bracket.
 
 `correct OUTPUT_DIR [--gpu yes|NAME]` runs a finished run again from its matte with the
 corrections in its store (`store/corrections.json`, the strokes the app paints), reusing the
@@ -100,11 +103,11 @@ The stages also run one at a time:
 
 ```sh
 cargo build --release --locked
-target/release/star-photos inspect /Volumes/Work/star-photos-data/wild-river-2024-04-14/raw/DSC_0226.NEF
-target/release/star-photos levels /Volumes/Work/star-photos-data/wild-river-2024-04-14/raw/DSC_0226.NEF
-target/release/star-photos develop /Volumes/Work/star-photos-data/wild-river-2024-04-14/raw/DSC_0226.NEF /Volumes/Work/star-photos-data/validation/native-first
-target/release/star-photos check /Volumes/Work/star-photos-data/bwca-2024-05-19/raw
-target/release/star-photos flat /Volumes/Work/star-photos-data/maplewood-2025-09-26/raw/DSC_3910.NEF
+target/release/pictor inspect /Volumes/Work/star-photos-data/wild-river-2024-04-14/raw/DSC_0226.NEF
+target/release/pictor levels /Volumes/Work/star-photos-data/wild-river-2024-04-14/raw/DSC_0226.NEF
+target/release/pictor develop /Volumes/Work/star-photos-data/wild-river-2024-04-14/raw/DSC_0226.NEF /Volumes/Work/star-photos-data/validation/native-first
+target/release/pictor check /Volumes/Work/star-photos-data/bwca-2024-05-19/raw
+target/release/pictor flat /Volumes/Work/star-photos-data/maplewood-2025-09-26/raw/DSC_3910.NEF
 ```
 
 The output directory must not already exist; its parent must exist. Outputs:
