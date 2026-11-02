@@ -95,11 +95,13 @@ pub fn show(ui: &mut Ui, error: Option<&str>, recent: &[PathBuf]) -> Option<Acti
         }
         if let Some(e) = error {
             ui.add_space(16.0);
-            ui.horizontal(|ui| {
+            ui.horizontal_top(|ui| {
                 ui.add_space((ui.available_width() - width).max(0.0) / 2.0);
                 ui.set_max_width(width);
                 widgets::icon(ui, Icon::Warn, 18.0);
-                ui.label(RichText::new(e).color(WARN));
+                ui.vertical(|ui| {
+                    ui.label(RichText::new(e).color(WARN));
+                });
             });
         }
     });

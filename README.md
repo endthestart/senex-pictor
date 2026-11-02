@@ -1,9 +1,27 @@
 # SENEX Pictor
 
-An open-source standalone nightscape stacker in development, written in Rust. The app and
-its command are `pictor` (Pictor.app on macOS); no public release yet.
+An open-source nightscape stacker written in Rust: a night of frames from a tripod becomes one
+photo, with the sky stacked and the foreground as it was shot. The app and its command are
+`pictor` (Pictor.app on macOS).
 
-Taking over development? Read the [agent handoff](docs/HANDOFF.md) first.
+## 0.1.0 preview: read this first
+
+Most people cannot run this on their own photos yet.
+
+- **Cameras:** only the Nikon Z6 II and D700 have colour matrices, and they are the only cameras
+  it has been tested on. Import stops on any other camera.
+- **Lens data:** Pictor reads lensfun's vignetting database but does not include it. Install
+  [darktable](https://www.darktable.org/) or Homebrew's `lensfun`, or set `PICTOR_LENSFUN` to the
+  database folder. Without it, Import stops.
+- **Platforms:** the release is a macOS build (12 or later, Apple silicon and Intel). Linux and
+  Windows compile but have never been run.
+- **Signing:** the build is ad hoc signed, not notarized, so macOS blocks the first open. Try to
+  open it, then choose Open Anyway in System Settings > Privacy & Security.
+- **Testing:** headless tests drive all six screens, but nobody has yet taken a real folder
+  through them by hand.
+
+To try it, download `Pictor-macos.zip` from [Releases](../../releases), or build from source with
+Rust stable: `cargo run --release -p pictor`.
 
 Start with [the planning index](docs/README.md), [requirements](docs/requirements.md),
 [milestone plan](docs/plan.md), and [current status](docs/status.md).
@@ -103,11 +121,11 @@ The stages also run one at a time:
 
 ```sh
 cargo build --release --locked
-target/release/pictor inspect /Volumes/Work/star-photos-data/wild-river-2024-04-14/raw/DSC_0226.NEF
-target/release/pictor levels /Volumes/Work/star-photos-data/wild-river-2024-04-14/raw/DSC_0226.NEF
-target/release/pictor develop /Volumes/Work/star-photos-data/wild-river-2024-04-14/raw/DSC_0226.NEF /Volumes/Work/star-photos-data/validation/native-first
-target/release/pictor check /Volumes/Work/star-photos-data/bwca-2024-05-19/raw
-target/release/pictor flat /Volumes/Work/star-photos-data/maplewood-2025-09-26/raw/DSC_3910.NEF
+target/release/pictor inspect FRAME.NEF
+target/release/pictor levels FRAME.NEF
+target/release/pictor develop FRAME.NEF NEW_OUTPUT_DIR
+target/release/pictor check RAW_DIR
+target/release/pictor flat FRAME.NEF
 ```
 
 The output directory must not already exist; its parent must exist. Outputs:
@@ -136,8 +154,8 @@ which would break the verbatim vendor source inventory.
 Private corpus tooling requires Python 3 and ExifTool, solely for development:
 
 ```sh
-python3 tools/inventory.py /Volumes/Work/star-photos-data/wild-river-2024-04-14/raw /Volumes/Work/star-photos-data/validation/corpus-new.json
-python3 tools/validate_corpus.py /Volumes/Work/star-photos-data/wild-river-2024-04-14/raw /Volumes/Work/star-photos-data/validation/corpus.json /Volumes/Work/star-photos-data/validation/run-1
+python3 tools/inventory.py RAW_DIR NEW_CORPUS.json
+python3 tools/validate_corpus.py RAW_DIR CORPUS.json NEW_OUTPUT_DIR
 ```
 
 These tools reject existing destinations. Inventory hashes every capture and uses
@@ -153,7 +171,8 @@ and notices. See [reuse audit](docs/reuse-audit.md) and
 [source inventory](docs/source-lock.json), pinned to upstream Classic dbe90dc
 (checked 2026-10-25).
 Pictor is licensed under either of [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at
-your option. A complete dependency and data attribution audit for distribution remains open.
+your option. The app's Third-Party Notices (`app/assets/notices.txt`) list every crate it ships
+and the fonts and data it includes.
 
 The prior Python POC and generated baselines remain temporarily for comparison.
 They impose no compatibility requirement and can be removed after useful evidence

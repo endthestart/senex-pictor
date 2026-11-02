@@ -2,7 +2,6 @@
 
 Agreed with Michael Anderson on 2026-10-25. Working name: Star Photos; named Pictor (SENEX Pictor) on 2026-10-29.
 
-- [Agent handoff](HANDOFF.md): start here to take over implementation.
 - [Requirements](requirements.md): accepted product scope and traceable requirements.
 - [Execution plan](plan.md): milestones, dependencies, and completion gates.
 - [Processing specification](processing.md): data contracts, RAW stages, scene handling.
@@ -16,6 +15,3 @@ Agreed with Michael Anderson on 2026-10-25. Working name: Star Photos; named Pic
 Requirements and accepted ADRs govern implementation. Proposed choices remain explicit.
 Update status and validation evidence when a milestone changes; do not equate a
 successful decode with camera validation or a working CLI with a finished desktop app.
-
-The repository currently has no Git metadata. No commits or remote publication are
-part of this milestone. The original captures and prior POC outputs are private inputs.

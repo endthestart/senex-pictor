@@ -8,19 +8,19 @@ file to Z8 HE/HE* or another Nikon variant.
 
 ## Corpus
 
-Private data lives outside the repository under `/Volumes/Work/star-photos-data/` (Work disk); the first
+Private data lives outside the repository under `$STAR_DATA/` (the owner's Work disk); the first
 sequence's originals and sidecars are in `wild-river-2024-04-14/raw/`, excluded from distribution. Inventory
 RAW files independently of ON1/XMP sidecars and movies. Record SHA-256, byte count,
 metadata, sequence grouping, frame count and gaps. Preserve originals read-only.
 Fast metadata inventory may precede full byte hashing; mark it incomplete until hashes
-exist. Generated outputs and machine-specific results belong in `/Volumes/Work/star-photos-data/validation/`.
+exist. Generated outputs and machine-specific results belong in `$STAR_DATA/validation/`.
 
-Private external sets in `/Volumes/Work/star-photos-data/validation/datasets/` (not redistributable): Humboldt
+Private external sets in `$STAR_DATA/validation/datasets/` (not redistributable): Humboldt
 University Canon EOS 40D Heart Nebula and Pleiades lights/darks/flats/bias, archive
 SHA-256 recorded in [status](status.md). The Z6 II is no longer available for new
 captures; its 262 lights remain the nightscape reference.
 
-Owner datasets, copied 2026-10-26 to `/Volumes/Work/star-photos-data/` (private, never
+Owner datasets, copied 2026-10-26 to `$STAR_DATA/` (private, never
 redistributed; RAWs with the owner's ON1 sidecars, edited JPEG exports and final videos):
 
 | Dataset | Frames | Capture | Role |

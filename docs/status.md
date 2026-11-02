@@ -187,7 +187,7 @@ Vendored source integrity: 166 files. Format only the first-party package, becau
 `cargo fmt --all` also formats path dependencies. Vendor originals were restored
 and their hashes verified after discovering that behavior.
 
-Private run: `/Volumes/Work/star-photos-data/validation/native-validation/validation.json`, complete=true.
+Private run: `$STAR_DATA/validation/native-validation/validation.json`, complete=true.
 Header metadata and source hash checks: 262/262 passed against independent inventory.
 Full pixel decoding/development/export: DSC_0226, DSC_0357, DSC_0487 only.
 All three outputs: 6048 × 4024 pixels, RGB float32; ExifTool verified TIFF tags.
@@ -207,14 +207,14 @@ All captures: Nikon Z6 II, ISO 1600, 20 seconds, f/4, 24 mm, NEF compression tag
 Other Nikon bodies/compressions and other cameras have no local validation evidence yet.
 
 Second session (same machine/toolchain): all five commands pass with 23 tests.
-`/Volumes/Work/star-photos-data/validation/dbe90dc-validation/validation.json` (decoder dbe90dc) repeated
+`$STAR_DATA/validation/dbe90dc-validation/validation.json` (decoder dbe90dc) repeated
 262/262 header and source-hash checks and the three developments; their TIFF pixel
 data hash identically to `session2-validation` (snapshot decoder) and to
 `calibration-refactor-validation` (after the shared sensor-check refactor). Sensor
 measurements and the absence of local calibration frames are in
 [ADR 0006](adr/0006-calibration.md).
 
-External datasets (private, `/Volumes/Work/star-photos-data/validation/datasets/`): `HeartNebula.zip`
+External datasets (private, `$STAR_DATA/validation/datasets/`): `HeartNebula.zip`
 1,085,014,451 bytes, SHA-256 4a0c4142d8d0e7b056ec9b46046eec78fe6fc149aabf3c028923f81d6851f0a0;
 `Pleiades.zip` 2,181,389,750 bytes, SHA-256
 8fa8d9fbfb1a04fb53ade058516ca715bdbf8dc704e5d0d7b072e614a0b27f69.
@@ -227,14 +227,16 @@ Calibration: only private Canon 40D calibration sets; the decoder exposes no shu
 mode, compression, NR or temperature, which ADR 0006 needs for dark matching.
 
 No complete dark/flat/bias calibration, shared development recipe, camera
-characterization, color-managed master export, TIFF input, PSF/photometry study or
-distribution audit. Licence: MIT OR Apache-2.0 (owner decision, 2026-10-29).
+characterization, color-managed master export, TIFF input or PSF/photometry study.
+Licence: MIT OR Apache-2.0 (owner decision, 2026-10-29).
 Decoder-provided defaults versus explicitly recorded camera values need deeper audit.
 `develop`'s diagnostics are not release-quality photographic outputs.
 
 ## Next bounded work
 
-No new work during the cleanup week. First release gates are in [STATUS](../STATUS.md). After that:
+No new work during the cleanup week. The 0.1.0 preview's limits are in the [README](../README.md).
+After that, first colour matrices for more cameras and a bundled lens database, so the app runs
+for people without a Z6 II or D700 and darktable. Then:
 
 1. Re-audit the RAW decoder choice under ADR 0007 (LibRaw, rawler, LightCraft;
    Classic is now 08f7526c8); guard truncated packed NEFs, which Classic zero-fills.

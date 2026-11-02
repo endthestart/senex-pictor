@@ -1,7 +1,6 @@
 # ADR 0011: egui on a shared wgpu device for the desktop app
 
-Status: accepted, 2026-10-27. Evidence: [app research report](../../reports/Star%20Photos%20app%20research.md)
-(toolkit survey) and the canvas spike (`spikes/canvas`, later the app crate); the owner ran the
+Status: accepted, 2026-10-27. Evidence: a survey of Rust UI toolkits and the canvas spike (`spikes/canvas`, later the app crate); the owner ran the
 spike on an Apple M2 Max and agreed to proceed.
 
 ## Context

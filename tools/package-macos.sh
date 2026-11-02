@@ -13,7 +13,7 @@ targets="aarch64-apple-darwin x86_64-apple-darwin"
 cd "$root"
 ./tools/notices.sh
 for t in $targets; do
-    RUSTC="$toolchain/rustc" CARGO_TARGET_DIR=target/package \
+    RUSTFLAGS="--remap-path-prefix=$HOME=~" RUSTC="$toolchain/rustc" CARGO_TARGET_DIR=target/package \
         "$toolchain/cargo" build --release -q -p pictor --target "$t"
 done
 

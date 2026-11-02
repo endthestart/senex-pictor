@@ -4,9 +4,10 @@ Updated 2026-11-02. The closing note for the owner's cleanup week; detail is in
 [docs/status.md](docs/status.md) and the plan for the suite is in the
 [SENEX photo suite roadmap](https://claude.ai/artifact/XdZEY2gDarpfCR2HzhvNSi).
 
-Everything is on `main`, pushed: no other branches, tags, stashes or unpushed commits, so nothing
-waits to merge. On 2026-11-01 all 61 workspace tests passed and formatting was clean; the UI tests
-that need real run folders last ran on 2026-10-30. There is no CI and no public release.
+Everything is on `main`, pushed: no other branches, stashes or unpushed commits, so nothing waits
+to merge. On 2026-11-02 all 61 workspace tests passed with all five UI test folders set, and
+formatting and lints were clean. There is no CI. The first public release is the 0.1.0 preview,
+and its limits are at the top of the [README](README.md).
 
 Done: the stacker from RAW folder to finished image, the six-step desktop app, the design shared
 with SENEX Corvus ([tokens v1](docs/DESIGN-TOKENS.md)), and the speed-ups (a BWCA run went from
@@ -18,15 +19,15 @@ with SENEX Corvus ([tokens v1](docs/DESIGN-TOKENS.md)), and the speed-ups (a BWC
 | What | Waiting on |
 | --- | --- |
 | Running the app's six steps by hand on a real folder | Owner |
-| First release and the GitHub publish | Owner's decision, after the run-through |
-| Before publishing: personal paths in tracked docs and history; renaming the Gitea repo (`andermic-star-stacker`) | Owner's decision on how; then this repo |
+| Renaming the Gitea repo (`andermic-star-stacker`) | Owner |
 | A notarized build (today's is ad hoc signed) | Owner: an Apple Developer ID |
+| Colour matrices for more cameras and a bundled lens database, so the app runs without a Z6 II or D700 and darktable | First job after the cleanup week |
 | The site's "Pictor source opens with its first release" | Website session, told when it becomes true |
 | HDR: a tripod bracket at fixed ISO 64 | Parked until new work resumes |
 
 ## Star data
 
-`/Volumes/Work/star-photos-data` is 95 GiB by `du`, on a drive that is 37% full (592 GiB free). On
+The private data (`$STAR_DATA`, on the Work drive) is 104 GiB by `du`, on a drive that is 38% full (about 583 GiB free). On
 2026-11-02 the 3,180 RAW and edited copies in the six manifests matched their NAS originals by size
 and SHA-256, then about 540 GiB of caches and old runs were deleted. The `hdr-walk` RAWs have no
 manifest and were not checked.
@@ -35,7 +36,7 @@ manifest and were not checked.
 | --- | --- | --- |
 | RAW and edited copies, manifests, sequence checks, colour matrices (with the `hdr-walk` RAWs) | 64 | The test deck needs the RAWs |
 | `validation/`: `datasets` and the four `*-validation` runs, small reports | 10 | docs/status.md cites them |
-| `app-test/`: `yellowstone-ui`, `yellowstone-correct`, `yellowstone-stopped` | 22 | The UI tests use them |
+| `app-test/`: `yellowstone-ui`, `yellowstone-correct`, `yellowstone-stopped`, `bwca-stack` | 31 | The UI tests use them |
 
 ## Move list
 
