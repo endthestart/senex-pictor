@@ -1,6 +1,6 @@
 # Pictor status
 
-Updated 2026-11-01. The closing note for the owner's cleanup week; detail is in
+Updated 2026-11-02. The closing note for the owner's cleanup week; detail is in
 [docs/status.md](docs/status.md) and the plan for the suite is in the
 [SENEX photo suite roadmap](https://claude.ai/artifact/XdZEY2gDarpfCR2HzhvNSi).
 
@@ -18,7 +18,6 @@ with SENEX Corvus ([tokens v1](docs/DESIGN-TOKENS.md)), and the speed-ups (a BWC
 | What | Waiting on |
 | --- | --- |
 | Running the app's six steps by hand on a real folder | Owner |
-| Freeing the Work drive (below) | Owner's OK, with the NAS mounted to check the RAW copies |
 | First release and the GitHub publish | Owner's decision, after the run-through |
 | Before publishing: personal paths in tracked docs and history; renaming the Gitea repo (`andermic-star-stacker`) | Owner's decision on how; then this repo |
 | A notarized build (today's is ad hoc signed) | Owner: an Apple Developer ID |
@@ -27,21 +26,16 @@ with SENEX Corvus ([tokens v1](docs/DESIGN-TOKENS.md)), and the speed-ups (a BWC
 
 ## Star data
 
-`/Volumes/Work/star-photos-data` is 636 GiB by `du`, on a drive that is 94% full (58 GiB free).
-Nothing has been deleted. Some folders are APFS clones, so deleting frees less than these sizes.
+`/Volumes/Work/star-photos-data` is 95 GiB by `du`, on a drive that is 37% full (592 GiB free). On
+2026-11-02 the 3,180 RAW and edited copies in the six manifests matched their NAS originals by size
+and SHA-256, then about 540 GiB of caches and old runs were deleted. The `hdr-walk` RAWs have no
+manifest and were not checked.
 
-| Group | GiB | Verdict |
+| What stays | GiB | Why |
 | --- | --- | --- |
-| RAW and edited copies, manifests, sequence checks, colour matrices (with the `hdr-walk` RAWs) | 64 | Stay until checked against the NAS (not mounted on 2026-11-01); the test deck needs the RAWs |
-| `validation/`: `datasets` and the four `*-validation` runs that docs/status.md cites, small reports | 10 | Stay |
-| `app-test/`: `yellowstone-ui`, `yellowstone-correct`, `yellowstone-stopped` | 22 | Stay for the UI tests |
-| `*/work*`: Python prototype caches, kept only as comparison evidence | 181 | Can go; the app does not use them |
-| `*/process`: runs of the pipeline from 2026-10-26/27 | 173 | Can go; `pictor process` remakes them |
-| `validation/`: `iter*` and the `ingest-*`, `bwca-36`, `yellowstone-lit` baselines | 103 | Can go |
-| `*/rust`: Rust port parity stores | 63 | Can go |
-| `app-test/`: `bwca`, `yellowstone`; `hdr-walk/proto`; `yellowstone-2013-08-27/hero` | 21 | Can go |
-
-That is about 96 GiB to keep and 540 GiB that can go.
+| RAW and edited copies, manifests, sequence checks, colour matrices (with the `hdr-walk` RAWs) | 64 | The test deck needs the RAWs |
+| `validation/`: `datasets` and the four `*-validation` runs, small reports | 10 | docs/status.md cites them |
+| `app-test/`: `yellowstone-ui`, `yellowstone-correct`, `yellowstone-stopped` | 22 | The UI tests use them |
 
 ## Move list
 
