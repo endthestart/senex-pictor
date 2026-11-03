@@ -4,8 +4,8 @@ Updated 2026-11-02. The closing note for the owner's cleanup week; detail is in
 [docs/status.md](docs/status.md) and the plan for the suite is in the
 [SENEX photo suite roadmap](https://claude.ai/artifact/XdZEY2gDarpfCR2HzhvNSi).
 
-Everything is on `main`, pushed: no other branches, stashes or unpushed commits, so nothing waits
-to merge. On 2026-11-02 all 61 workspace tests passed with all five UI test folders set, and
+Everything is on `main`, pushed to Gitea and to [GitHub](https://github.com/endthestart/senex-pictor):
+no other branches, stashes or unpushed commits, so nothing waits to merge. On 2026-11-02 all 61 workspace tests passed with all five UI test folders set, and
 formatting and lints were clean. There is no CI. The first public release is the 0.1.0 preview,
 and its limits are at the top of the [README](README.md).
 
@@ -22,7 +22,7 @@ with SENEX Corvus ([tokens v1](docs/DESIGN-TOKENS.md)), and the speed-ups (a BWC
 | Renaming the Gitea repo (`andermic-star-stacker`) | Owner |
 | A notarized build (today's is ad hoc signed) | Owner: an Apple Developer ID |
 | Colour matrices for more cameras and a bundled lens database, so the app runs without a Z6 II or D700 and darktable | First job after the cleanup week |
-| The site's "Pictor source opens with its first release" | Website session, told when it becomes true |
+| The site's "Pictor source opens with its first release", now out of date | Website session, told 2026-11-02 |
 | HDR: a tripod bracket at fixed ISO 64 | Parked until new work resumes |
 
 ## Star data
@@ -42,7 +42,7 @@ manifest and were not checked.
 
 | Thing | Today | After the move off the Mac Pro |
 | --- | --- | --- |
-| Source | Gitea | The same; any clone builds |
+| Source | Gitea (`origin`) and public GitHub (`github`) | The same; any clone builds |
 | macOS package, Metal and UI tests | Mac Pro | Needs a Mac: the Mac Pro woken on demand, or the owner's laptop. Needs rustup stable with both macOS targets, Xcode's command-line tools and `cargo-about` |
 | Compile checks, engine tests | Mac Pro | A non-Mac machine should do. The Linux and Windows checks are clean from the Mac; the tests have not run on Linux |
 | CI | None | Not set up. Gitea Actions could run fmt, clippy and engine tests; UI tests need a GPU and packaging a macOS runner |
