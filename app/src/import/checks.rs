@@ -7,8 +7,8 @@ use super::Lookups;
 use crate::theme::{GOOD, MUTED, WARN};
 use crate::widgets::{Icon, bytes, duration};
 use egui::Color32;
+use pictor_engine::cameras;
 use pictor_engine::process::{self, disk};
-use pictor_engine::review;
 
 pub struct Check {
     pub icon: Icon,
@@ -134,7 +134,7 @@ impl Checks {
             s.model.clone().unwrap_or_default(),
         );
         let camera = camera_name(&make, &model);
-        match review::built_in_matrix(&make, &model) {
+        match cameras::built_in_matrix(&make, &model) {
             Ok(Some(_)) => c.items.push(Check {
                 icon: Icon::Done,
                 title: "Colour",

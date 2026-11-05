@@ -1,5 +1,5 @@
 use pictor_engine::Result;
-use pictor_engine::lens::{field, find, same_lens, vignetting_entries};
+use pictor_engine::lens::{Database, field, find, same_lens, vignetting_entries};
 use pictor_engine::store::file::{f16_bytes, f16_values, pack_bits, unpack_bits};
 use pictor_engine::store::seconds;
 use std::path::PathBuf;
@@ -92,10 +92,11 @@ fn the_profile_at_the_nearest_aperture_is_chosen_and_a_missing_one_fails() -> Re
     let entries = vignetting_entries(LENSFUN)?;
     assert_eq!(entries.len(), 3);
     let dir = database("lens")?;
-    let near = find(&dir, "NIKON", "AF Nikkor 24mm f/2.8D", 24.0, 4.5)?;
+    let lensfun = Database::Dir(dir.clone());
+    let near = find(&lensfun, "NIKON", "AF Nikkor 24mm f/2.8D", 24.0, 4.5)?;
     assert_eq!((near.aperture, near.k), (5.6, [-0.3, 0.1, -0.1]));
-    assert!(find(&dir, "NIKON", "AF Nikkor 24mm f/2.8D", 35.0, 2.8).is_err());
-    assert!(find(&dir, "NIKON", "AF Nikkor 28mm f/2.8D", 24.0, 2.8).is_err());
+    assert!(find(&lensfun, "NIKON", "AF Nikkor 24mm f/2.8D", 35.0, 2.8).is_err());
+    assert!(find(&lensfun, "NIKON", "AF Nikkor 28mm f/2.8D", 24.0, 2.8).is_err());
     std::fs::remove_dir_all(dir)?;
     Ok(())
 }

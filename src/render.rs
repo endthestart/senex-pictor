@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn bright_star_cores_keep_every_colour() -> Result<()> {
-        let xyz_to_camera = crate::review::built_in_matrix("NIKON CORPORATION", "NIKON D700")?
+        let xyz_to_camera = crate::cameras::built_in_matrix("NIKON CORPORATION", "NIKON D700")?
             .ok_or_else(|| error("no D700 matrix"))?;
         let (white, flat) = (16383.0, 0.8);
         let scene = Scene {

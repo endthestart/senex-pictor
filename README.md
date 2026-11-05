@@ -6,11 +6,11 @@ photo, with the sky stacked and the foreground as it was shot. The app and its c
 
 ## 0.1.0 preview: read this first
 
-Most people cannot run this on their own photos yet.
+Most people cannot run 0.1.0 on their own photos.
 
-- **Cameras:** only the Nikon Z6 II and D700 have colour matrices, and they are the only cameras
-  it has been tested on. Import stops on any other camera.
-- **Lens data:** Pictor reads lensfun's vignetting database but does not include it. Install
+- **Cameras:** 0.1.0 has colour matrices only for the Nikon Z6 II and D700, the only cameras it
+  has been tested on. Import stops on any other camera.
+- **Lens data:** 0.1.0 reads lensfun's vignetting database but does not include it. Install
   [darktable](https://www.darktable.org/) or Homebrew's `lensfun`, or set `PICTOR_LENSFUN` to the
   database folder. Without it, Import stops.
 - **Platforms:** the release is a macOS build (12 or later, Apple silicon and Intel). Linux and
@@ -19,6 +19,12 @@ Most people cannot run this on their own photos yet.
   open it, then choose Open Anyway in System Settings > Privacy & Security.
 - **Testing:** headless tests drive all six screens, but nobody has yet taken a real folder
   through them by hand.
+
+Since 0.1.0, `main` builds in colour matrices for about 800 cameras (LibRaw 0.22.1's table,
+found by the model name the files write) and lensfun's lens database, so neither limit above
+applies to a build from source. Import still stops on a camera the table does not name, such as
+one released after it, and on a lens with no vignetting profile. Only the Z6 II and D700 have
+been tested with real photos. No release includes this yet.
 
 To try it, download `Pictor-macos.zip` from [Releases](../../releases), or build from source with
 Rust stable: `cargo run --release -p pictor`.
@@ -117,7 +123,7 @@ The stages also run one at a time:
   that lifts the brightest stars up to four times paper white on HDR displays). The camera's colour matrix comes from `data/colour-matrices.json` unless a file
   is given.
 - `flat INPUT [LENS]`: the lensfun vignetting profile for the file's lens, focal length and
-  aperture (lensfun's database is read in place; set `PICTOR_LENSFUN` to choose it).
+  aperture, from the built-in copy of lensfun's database or the folder `PICTOR_LENSFUN` names.
 
 ```sh
 cargo build --release --locked

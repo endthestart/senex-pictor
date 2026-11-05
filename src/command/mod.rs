@@ -173,7 +173,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             println!(
                 "{}",
                 serde_json::to_string_pretty(&lens::find(
-                    &lens::database()?,
+                    &lens::Database::from_env()?,
                     maker,
                     &lens,
                     focal,

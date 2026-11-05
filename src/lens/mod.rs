@@ -1,22 +1,76 @@
-//! Lens vignetting from the lensfun database (data CC-BY-SA 3.0), read in place.
+//! Lens vignetting from the lensfun database (data CC BY-SA 3.0): the copy built into Pictor,
+//! or the directory `PICTOR_LENSFUN` names.
 //!
 //! lensfun's "pa" model: V(r) = 1 + k1 r² + k2 r⁴ + k3 r⁶, with r measured from the image
 //! centre and 1 at the corner. A flat field divides each sample by V at its sensor position.
 //! Profiles are the starting point until vignetting is measured from the stars themselves.
 
+mod bundled;
+
 use crate::{Result, error};
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
 use serde::Serialize;
-use std::path::{Path, PathBuf};
+use std::borrow::Cow;
+use std::path::PathBuf;
 
-/// Where lensfun's XML database is looked for when `PICTOR_LENSFUN` is unset.
-const KNOWN_DATABASES: &[&str] = &[
-    "/Applications/darktable.app/Contents/Resources/share/lensfun/version_1",
-    "/opt/homebrew/share/lensfun/version_1",
-    "/usr/local/share/lensfun/version_1",
-    "/usr/share/lensfun/version_1",
-];
+/// Where lensfun's XML comes from.
+pub enum Database {
+    /// The copy built into Pictor.
+    BuiltIn,
+    /// A directory of lensfun's XML files.
+    Dir(PathBuf),
+}
+
+impl Database {
+    /// The directory `PICTOR_LENSFUN` names, else the built-in copy.
+    pub fn from_env() -> Result<Database> {
+        let Some(dir) = std::env::var_os("PICTOR_LENSFUN") else {
+            return Ok(Database::BuiltIn);
+        };
+        let dir = PathBuf::from(dir);
+        if dir.is_dir() {
+            Ok(Database::Dir(dir))
+        } else {
+            Err(error(format!(
+                "PICTOR_LENSFUN is not a directory: {}",
+                dir.display()
+            )))
+        }
+    }
+
+    /// Where a profile came from, as reports record it.
+    pub fn describe(&self) -> String {
+        match self {
+            Database::BuiltIn => format!("built-in lensfun database ({})", bundled::PUBLISHED),
+            Database::Dir(dir) => dir.display().to_string(),
+        }
+    }
+
+    /// Every XML file's text, in file-name order.
+    fn files(&self) -> Result<Vec<Cow<'static, str>>> {
+        match self {
+            Database::BuiltIn => Ok(bundled::FILES
+                .iter()
+                .map(|(_, xml)| Cow::Borrowed(*xml))
+                .collect()),
+            Database::Dir(dir) => {
+                let mut paths = Vec::new();
+                for entry in std::fs::read_dir(dir)? {
+                    let path = entry?.path();
+                    if path.extension().is_some_and(|x| x == "xml") {
+                        paths.push(path);
+                    }
+                }
+                paths.sort();
+                paths
+                    .iter()
+                    .map(|p| Ok(Cow::Owned(std::fs::read_to_string(p)?)))
+                    .collect()
+            }
+        }
+    }
+}
 
 #[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct Vignetting {
@@ -24,32 +78,7 @@ pub struct Vignetting {
     pub focal_mm: f64,
     pub aperture: f64,
     pub k: [f64; 3],
-    pub database: PathBuf,
-}
-
-/// The lensfun database directory: `PICTOR_LENSFUN`, else the first known location.
-pub fn database() -> Result<PathBuf> {
-    if let Some(dir) = std::env::var_os("PICTOR_LENSFUN") {
-        let dir = PathBuf::from(dir);
-        return if dir.is_dir() {
-            Ok(dir)
-        } else {
-            Err(error(format!(
-                "PICTOR_LENSFUN is not a directory: {}",
-                dir.display()
-            )))
-        };
-    }
-    KNOWN_DATABASES
-        .iter()
-        .map(PathBuf::from)
-        .find(|dir| dir.is_dir())
-        .ok_or_else(|| {
-            error(format!(
-                "no lensfun database found; set PICTOR_LENSFUN (looked in {})",
-                KNOWN_DATABASES.join(", ")
-            ))
-        })
+    pub database: String,
 }
 
 /// Lens names compare without case, repeated spaces or a leading maker word that one side
@@ -67,20 +96,15 @@ pub fn same_lens(a: &str, b: &str, maker: &str) -> bool {
 /// The calibrated "pa" profile for `lens` at `focal_mm` (within 0.5 mm) whose aperture is
 /// nearest to `aperture` in stops. Fails when the database has no such entry.
 pub fn find(
-    database: &Path,
+    database: &Database,
     maker: &str,
     lens: &str,
     focal_mm: f64,
     aperture: f64,
 ) -> Result<Vignetting> {
     let mut best: Option<(f64, Vignetting)> = None;
-    let mut files: Vec<PathBuf> = std::fs::read_dir(database)?
-        .filter_map(|entry| entry.ok().map(|e| e.path()))
-        .filter(|p| p.extension().is_some_and(|x| x == "xml"))
-        .collect();
-    files.sort();
-    for file in files {
-        for entry in vignetting_entries(&std::fs::read_to_string(&file)?)? {
+    for xml in database.files()? {
+        for entry in vignetting_entries(&xml)? {
             if !entry.models.iter().any(|m| same_lens(m, lens, maker))
                 || (entry.focal_mm - focal_mm).abs() > 0.5
             {
@@ -93,7 +117,7 @@ pub fn find(
                     focal_mm: entry.focal_mm,
                     aperture: entry.aperture,
                     k: entry.k,
-                    database: database.to_path_buf(),
+                    database: database.describe(),
                 };
                 best = Some((stops, found));
             }
@@ -114,19 +138,14 @@ pub fn for_camera(
     aperture: f64,
 ) -> Result<Vignetting> {
     let maker = make.and_then(|s| s.split_whitespace().next()).unwrap_or("");
-    find(&database()?, maker, lens, focal_mm, aperture)
+    find(&Database::from_env()?, maker, lens, focal_mm, aperture)
 }
 
 /// Every lens with a calibrated "pa" profile at `focal_mm` (within 0.5 mm), by name.
 pub fn candidates(focal_mm: f64) -> Result<Vec<String>> {
-    let database = database()?;
     let mut names = Vec::new();
-    for entry in std::fs::read_dir(&database)? {
-        let path = entry?.path();
-        if path.extension().is_none_or(|x| x != "xml") {
-            continue;
-        }
-        for e in vignetting_entries(&std::fs::read_to_string(&path)?)? {
+    for xml in Database::from_env()?.files()? {
+        for e in vignetting_entries(&xml)? {
             if (e.focal_mm - focal_mm).abs() <= 0.5 {
                 names.extend(e.models.into_iter().take(1));
             }

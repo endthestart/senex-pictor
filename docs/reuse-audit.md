@@ -37,8 +37,10 @@ lockfile through the vendored crates, so nothing new was downloaded: `half` 2.7 
 `jpeg-encoder` 0.7 (MIT/Apache-2.0, review JPEGs), `wgpu` 30 with `pollster` 1 and `bytemuck`
 1 (MIT/Apache-2.0; the GPU sky stack), all from the local registry cache LightCraft uses. R7
 added `sysinfo` 0.37 (MIT, free memory for the default memory budget). The built-in colour
-matrices (`data/colour-matrices.json`) are Adobe's published ColorMatrix values for the Z6 II
-and D700, read from LibRaw's table through the rawpy oracle. The desktop app
+matrices (`data/colour-matrices.json`) are LibRaw 0.22.1's adobe_coeff table (LGPL-2.1 or
+CDDL-1.0; mostly Adobe DNG Converter's ColorMatrix values), written by
+`tools/colour_matrices.py`; lensfun's database (CC BY-SA 3.0) is built in from
+`data/lensfun/`, copied unchanged by `tools/lensfun.py`. The desktop app
 (`app/`) uses eframe/egui 0.36 (MIT/Apache-2.0) with `vendor/egui-wgpu`: egui-wgpu
 0.36.2 (MIT OR Apache-2.0) copied from LightCraft Classic's vendor folder with its HDR display
 patch (an `Rgba16Float` extended-linear-sRGB surface and egui drawn at SDR white), wired in through

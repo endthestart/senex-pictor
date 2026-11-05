@@ -5,7 +5,7 @@
 use crate::render::{self, Look, Matrix, Scene};
 use crate::separate::glow::CLEAR;
 use crate::store::{Store, planes};
-use crate::{Result, error, export};
+use crate::{Result, cameras, error, export};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -14,28 +14,6 @@ use std::path::Path;
 #[derive(Deserialize)]
 struct ColourMatrix {
     xyz_to_camera: Matrix,
-}
-
-#[derive(Deserialize)]
-struct Camera {
-    make: String,
-    model: String,
-    xyz_to_camera: Matrix,
-}
-
-#[derive(Deserialize)]
-struct Cameras {
-    cameras: Vec<Camera>,
-}
-
-/// The built-in colour matrix for a camera, if there is one.
-pub fn built_in_matrix(make: &str, model: &str) -> Result<Option<Matrix>> {
-    let known: Cameras = serde_json::from_str(include_str!("../data/colour-matrices.json"))?;
-    Ok(known
-        .cameras
-        .into_iter()
-        .find(|c| c.make == make && c.model == model)
-        .map(|c| c.xyz_to_camera))
 }
 
 /// The colour matrix in `path`, or the built-in one for the store's camera.
@@ -49,7 +27,7 @@ fn xyz_to_camera(store: &Store, path: Option<&Path>) -> Result<Matrix> {
         m.make.as_deref().unwrap_or(""),
         m.model.as_deref().unwrap_or(""),
     );
-    built_in_matrix(make, model)?.ok_or_else(|| {
+    cameras::built_in_matrix(make, model)?.ok_or_else(|| {
         error(format!(
             "no built-in colour matrix for {make} {model}; give one (--matrix JSON)"
         ))

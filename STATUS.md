@@ -1,17 +1,18 @@
 # Pictor status
 
-Updated 2026-11-02. The closing note for the owner's cleanup week; detail is in
+Updated 2026-11-05. The closing note for the owner's cleanup week; detail is in
 [docs/status.md](docs/status.md) and the plan for the suite is in the
 [SENEX photo suite roadmap](https://claude.ai/artifact/XdZEY2gDarpfCR2HzhvNSi).
 
 Everything is on `main`, pushed to Gitea and to [GitHub](https://github.com/endthestart/senex-pictor):
-no other branches, stashes or unpushed commits, so nothing waits to merge. On 2026-11-02 all 61 workspace tests passed with all five UI test folders set, and
+no other branches, stashes or unpushed commits, so nothing waits to merge. On 2026-11-05 all 64 workspace tests passed with all five UI test folders set, and
 formatting and lints were clean. There is no CI. The first public release is the 0.1.0 preview,
 and its limits are at the top of the [README](README.md).
 
 Done: the stacker from RAW folder to finished image, the six-step desktop app, the design shared
-with SENEX Corvus ([tokens v1](docs/DESIGN-TOKENS.md)), and the speed-ups (a BWCA run went from
-154 s to 65 s, outputs byte-identical). The HDR bracket merger is a parked prototype
+with SENEX Corvus ([tokens v1](docs/DESIGN-TOKENS.md)), the speed-ups (a BWCA run went from
+154 s to 65 s, outputs byte-identical), and, since 0.1.0 and not yet released, built-in colour
+matrices for about 800 cameras and a built-in lens database. The HDR bracket merger is a parked prototype
 (`tools/proto/hdr.py`), not part of the app.
 
 ## Blocked on whom
@@ -21,7 +22,6 @@ with SENEX Corvus ([tokens v1](docs/DESIGN-TOKENS.md)), and the speed-ups (a BWC
 | Running the app's six steps by hand on a real folder | Owner |
 | Renaming the Gitea repo (`andermic-star-stacker`) | Owner |
 | A notarized build (today's is ad hoc signed) | Owner: an Apple Developer ID |
-| Colour matrices for more cameras and a bundled lens database, so the app runs without a Z6 II or D700 and darktable | First job after the cleanup week |
 | The site's "Pictor source opens with its first release", now out of date | Website session, told 2026-11-02 |
 | HDR: a tripod bracket at fixed ISO 64 | Parked until new work resumes |
 
@@ -48,6 +48,5 @@ manifest and were not checked.
 | CI | None | Not set up. Gitea Actions could run fmt, clippy and engine tests; UI tests need a GPU and packaging a macOS runner |
 | Star data | Work drive, an external PCIe SSD | Stays on that drive; full-sequence runs happen wherever it is plugged in |
 | Originals | NAS | The same |
-| Lens database for `flat` | darktable.app's lensfun | darktable on the new Mac, or `PICTOR_LENSFUN` |
 | `.sources` (upstream clones and oracles, 500 MB) | Repo folder, ignored by git | Copy it to whichever machine refreshes the vendored code |
 | Local caches (`target` 41 GiB, `.cache`, `.venv`, `.venv-sam`, `.models`, `outputs`) | Repo folder, ignored by git | Do not move; rebuild `target`, and `.venv` only for `tools/icon.py` and the prototypes |

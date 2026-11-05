@@ -234,9 +234,13 @@ Decoder-provided defaults versus explicitly recorded camera values need deeper a
 
 ## Next bounded work
 
-No new work during the cleanup week. The 0.1.0 preview's limits are in the [README](../README.md).
-After that, first colour matrices for more cameras and a bundled lens database, so the app runs
-for people without a Z6 II or D700 and darktable. Then:
+The 0.1.0 preview's limits are in the [README](../README.md). Since then (2026-11-05) colour
+matrices for 790 entries of LibRaw 0.22.1's table are built in, found by whole model name plus
+the families and regional names listed in `tools/colour_matrices.py`; against rawspeed's camera
+list as an oracle, 669 of its 1,087 names resolve and none to another camera's matrix (51 carry
+a different Adobe matrix version than rawspeed's, mostly pre-2010 bodies). lensfun's database
+(published 2026-11-04) is built in; its profiles for the three owner lenses are unchanged from
+darktable's copy. Then:
 
 1. Re-audit the RAW decoder choice under ADR 0007 (LibRaw, rawler, LightCraft;
    Classic is now 08f7526c8); guard truncated packed NEFs, which Classic zero-fills.
