@@ -31,7 +31,8 @@ Rust stable: `cargo run --release -p pictor`.
 
 Start with [the planning index](docs/README.md), [requirements](docs/requirements.md),
 [milestone plan](docs/plan.md), and [current status](docs/status.md).
-[STATUS](STATUS.md) is the one-page closing note: what is done, what the data is, what waits on whom.
+[HANDOFF](HANDOFF.md) is where to pick the project up: its state, how to run and release it,
+open items and what waits on whom.
 
 ## What it does
 

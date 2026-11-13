@@ -1,7 +1,6 @@
 # Implementation status
 
-Updated: 2026-11-01 (closing point for the owner's cleanup week; one-page summary in
-[STATUS](../STATUS.md)).
+Updated: 2026-11-13 (work paused; where to pick it up is in [HANDOFF](../HANDOFF.md)).
 
 ## Milestone gates
 
@@ -253,6 +252,6 @@ darktable's copy. Then:
 5. Measure stellar PSFs and color/flux behavior of demosaic alternatives on held-out
    scenes; investigate memory peaks before scaling simultaneous frame work.
 
-The Python POC and prior outputs remain temporarily as private comparison evidence;
-the native application does not depend on them. No original image was modified and
+The Python POC (`tools/proto/`) remains as private comparison code; its local outputs and
+caches were cleared on 2026-11-13. The native application does not depend on it. No original image was modified and
 nothing was published.
