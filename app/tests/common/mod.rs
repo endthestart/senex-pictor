@@ -4,7 +4,7 @@
 use egui_kittest::Harness;
 use pictor::app::{Pictor, Start};
 use pictor_engine::{Result, error};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 pub const SIZE: [f32; 2] = [1440.0, 900.0];
@@ -88,6 +88,52 @@ pub fn save(image: &image::RgbaImage, name: &str) -> Result<()> {
         h as usize,
         90,
     )
+}
+
+/// A copy of a test folder beside it, removed when dropped, so a test can change the copy and
+/// leave the folder as it was. On APFS the files are clones and take no space.
+pub struct Scratch(pub PathBuf);
+
+impl Scratch {
+    /// Copies `folder`, leaving out every entry whose name starts with one of `skip`.
+    pub fn of(folder: &Path, skip: &[&str]) -> Result<Scratch> {
+        let name = folder
+            .file_name()
+            .ok_or_else(|| error(format!("{} has no name", folder.display())))?;
+        let copy = folder.with_file_name(format!(
+            "{}-test-{}",
+            name.to_string_lossy(),
+            std::process::id()
+        ));
+        let scratch = Scratch(copy);
+        copy_dir(folder, &scratch.0, skip)?;
+        Ok(scratch)
+    }
+}
+
+impl Drop for Scratch {
+    fn drop(&mut self) {
+        if let Err(e) = std::fs::remove_dir_all(&self.0) {
+            eprintln!("could not remove {}: {e}", self.0.display());
+        }
+    }
+}
+
+fn copy_dir(from: &Path, to: &Path, skip: &[&str]) -> Result<()> {
+    std::fs::create_dir(to)?;
+    for entry in std::fs::read_dir(from)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        if skip.iter().any(|s| name.to_string_lossy().starts_with(s)) {
+            continue;
+        }
+        if entry.file_type()?.is_dir() {
+            copy_dir(&entry.path(), &to.join(&name), skip)?;
+        } else {
+            std::fs::copy(entry.path(), to.join(&name))?;
+        }
+    }
+    Ok(())
 }
 
 /// A drag with the primary button from `from` to `to`, a frame per tenth of the way.

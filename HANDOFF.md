@@ -40,10 +40,10 @@ running processes. The GitHub release is the only thing deployed.
 - **Milestones:** the stacker runs from RAW folder to finished image. The six-step app (M4) is
   verified by headless tests, but nobody has taken a real folder through it by hand. The
   milestone table is in [docs/status.md](docs/status.md).
-- **Last full check:** 2026-11-13, for 0.2.0. fmt, clippy and the vendored-source check
-  (166 files) were clean. 63 of the 64 workspace tests passed with all five UI test folders set.
-  The moment test failed only because of what earlier runs left in its folder, and it passed
-  on a clean copy (open item 3).
+- **Last full check:** 2026-11-13. fmt, clippy and the vendored-source check (166 files) were
+  clean, and all 64 workspace tests passed twice in a row with all five UI test folders set. The
+  moment test works on a temporary copy of `PICTOR_UI_STACKED`, so it leaves that folder as it
+  was.
 - **Real photos:** only from a Nikon Z6 II and a D700.
 - **Machine:** the Mac Pro (Intel, macOS 15.7.4, Rust 1.99.1). After the release the build
   output and `dist/` were cleared again, as were the prototype caches and POC outputs, so the
@@ -100,24 +100,18 @@ cargo test --locked --release --workspace --no-fail-fast
    This is the M4 gate.
 2. **Notarization:** the release is ad hoc signed, so macOS blocks the first open. Notarizing
    needs an Apple Developer ID.
-3. **Repeatable moment test:** `a_moment_is_made_from_the_scene_step` (`app/tests/ui_scene.rs`)
-   fails once its `PICTOR_UI_STACKED` folder already holds a hero and a moment for the chosen
-   frame, because Scene then offers no "Make It". Earlier runs left both in
-   `app-test/bwca-stack`, as `hero-DSC_0950*`, `hero-occ` and `moment-DSC_0950*`. It also clicks
-   the last "Make It", which is the hero's when only the moment exists. Fix the test, or remove
-   those results before each full run.
-4. **CI:** there is none. Gitea Actions could run fmt, clippy and the engine tests. The UI tests
+3. **CI:** there is none. Gitea Actions could run fmt, clippy and the engine tests. The UI tests
    need a GPU and the data, and packaging needs a macOS runner.
-5. **DNG colour matrices:** the ColorMatrix inside a DNG file is ignored, so DNG-only cameras
+4. **DNG colour matrices:** the ColorMatrix inside a DNG file is ignored, so DNG-only cameras
    missing from LibRaw's table (some Leicas, phones) stop at Import.
-6. **Engine work**, listed under "Next bounded work" in [docs/status.md](docs/status.md):
+5. **Engine work**, listed under "Next bounded work" in [docs/status.md](docs/status.md):
    - re-audit the decoder (vendored Classic is at dbe90dc, upstream has moved on; truncated
      packed NEFs are zero-filled);
    - end-to-end calibration, cross-checked against Siril;
    - a colour and master-format ADR;
    - a stellar PSF study.
-7. **Matte:** lamp-lit swaying foliage (Maplewood) still needs painted corrections.
-8. **Parked:** the HDR bracket merger (`tools/proto/hdr.py`) needs a tripod bracket shot at a
+6. **Matte:** lamp-lit swaying foliage (Maplewood) still needs painted corrections.
+7. **Parked:** the HDR bracket merger (`tools/proto/hdr.py`) needs a tripod bracket shot at a
    fixed ISO 64.
 
 ## Owner steps pending
@@ -169,4 +163,4 @@ Moving off the Mac Pro:
 1. Mount the Work drive, pull `main` from both remotes, then run the checks and the full tests
    above. This confirms the toolchain still works; the first build is a full one.
 2. Run the six steps by hand on a real folder and write down what breaks (open item 1).
-3. Make the moment test repeatable (open item 3), then set up CI (open item 4).
+3. Set up CI (open item 3).

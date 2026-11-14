@@ -1,11 +1,11 @@
 mod common;
 
-use common::{drag, harness, save, wait};
+use common::{Scratch, drag, harness, save, wait};
 use egui_kittest::kittest::Queryable;
 use pictor::app::Pictor;
 use pictor::shell::Step;
 use pictor_engine::{Result, error};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 /// `PICTOR_UI_CORRECT`, which two of these tests change: one test at a time uses it.
@@ -49,22 +49,21 @@ fn a_hero_frame_is_made_from_the_scene_step() -> Result<()> {
 
 /// From the Scene step a short-window moment is made and opens in Compare
 /// (`PICTOR_UI_STACKED`, a processed folder with a whole-sequence stack; skipped without
-/// it; adds the moment to that folder).
+/// it). The test works on a copy without earlier hero frames and moments, so both are offered
+/// and the folder is left as it was.
 #[test]
 fn a_moment_is_made_from_the_scene_step() -> Result<()> {
     let Ok(folder) = std::env::var("PICTOR_UI_STACKED") else {
         eprintln!("PICTOR_UI_STACKED is not set; skipped");
         return Ok(());
     };
-    let mut h = harness(Some(PathBuf::from(folder)), None);
+    let copy = Scratch::of(Path::new(&folder), &["hero-", "moment-"])?;
+    let mut h = harness(Some(copy.0.clone()), None);
     wait(&mut h, 300, Pictor::opened)?;
     h.state_mut().show_step(Step::Scene);
     wait(&mut h, 60, Pictor::idle)?;
     let buttons = h.query_all_by_label("Make It").count();
-    assert!(
-        buttons >= 1,
-        "the moment should be offered for a stacked run"
-    );
+    assert_eq!(buttons, 2, "a hero frame and a moment should be offered");
     h.get_all_by_label("Make It")
         .last()
         .ok_or_else(|| error("no Make It"))?
@@ -72,6 +71,11 @@ fn a_moment_is_made_from_the_scene_step() -> Result<()> {
     h.step();
     assert!(!h.state().idle(), "Make It should start the moment");
     wait(&mut h, 900, |a| a.idle() && a.comparing())?;
+    let result = h.state().session().and_then(|s| s.result.clone());
+    assert!(
+        result.as_deref().is_some_and(|r| r.starts_with("moment-")),
+        "Compare should show the moment, not {result:?}"
+    );
     let opened = h.render().map_err(error)?;
     save(&opened, "scene-moment-compare.jpg")?;
     Ok(())
