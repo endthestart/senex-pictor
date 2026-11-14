@@ -150,6 +150,9 @@ cargo fmt -p pictor-engine -p pictor -- --check
 python3 tools/verify_sources.py
 ```
 
+GitHub Actions (`.github/workflows/ci.yml`) runs these, with the engine tests, on every push
+to `main`, plus a Linux compile check. The app's screen tests need a GPU and private test
+folders, so they run only locally.
 Use `--offline` with Cargo when required dependencies are already cached.
 Format only this package; `cargo fmt --all` also reformats local path dependencies,
 which would break the verbatim vendor source inventory.

@@ -28,12 +28,13 @@ and the rest, listed in the [README](README.md)).
 | --- | --- | --- |
 | Source | `main` on Gitea (`origin`, `git@gitea.andermic.net:endthestart/andermic-star-stacker.git`) and public GitHub (`github`, `git@github.com:endthestart/senex-pictor.git`) | `main` |
 | Release | [GitHub Releases](https://github.com/endthestart/senex-pictor/releases), "0.2.0 preview" (pre-release, tag `v0.2.0`, 2026-11-13): `Pictor-macos.zip`, universal, ad hoc signed. It adds built-in colour matrices for about 800 cameras (LibRaw 0.22.1's table) and lensfun's lens database (published 2026-11-04) to the 0.1.0 preview of 2026-11-02 | 0.2.0 |
+| CI | GitHub Actions on the public repo (`.github/workflows/ci.yml`), on every push to `main` and every pull request. On macOS: fmt, the vendored-source check, clippy, and the engine and design-token tests. On Linux: a compile check | n/a |
 | Private test data (`$STAR_DATA`) | `/Volumes/Work/star-photos-data` on the Work drive, an external PCIe SSD | n/a |
 | Original photos | NAS | n/a |
 | Upstream clones and oracles | `.sources/` in the repo folder (500 MB, ignored by git) | n/a |
 
-There are no other branches, stashes, worktrees, open pull requests, CI jobs, servers or
-running processes. The GitHub release is the only thing deployed.
+There are no other branches, stashes, worktrees, open pull requests, servers or running
+processes. Only the GitHub release is deployed, and only GitHub's hosted runners run CI.
 
 ## Current state
 
@@ -78,6 +79,9 @@ PICTOR_UI_STACKED=/Volumes/Work/star-photos-data/app-test/bwca-stack \
 cargo test --locked --release --workspace --no-fail-fast
 ```
 
+- **Other targets:** on the Mac Pro, Homebrew's Rust comes first in `PATH` and has only the
+  host target. Cross-target checks need rustup's toolchain, for example
+  `RUSTC=$(rustup which rustc) $(rustup which cargo) check --target x86_64-unknown-linux-gnu`.
 - **Package:** `tools/package-macos.sh` builds `dist/Pictor.app` (universal, ad hoc signed)
   and `dist/Pictor-macos.zip`, refreshing the Third-Party Notices with `cargo-about` 0.9.3 first.
   It needs both macOS Rust targets and Xcode's command-line tools.
@@ -100,18 +104,16 @@ cargo test --locked --release --workspace --no-fail-fast
    This is the M4 gate.
 2. **Notarization:** the release is ad hoc signed, so macOS blocks the first open. Notarizing
    needs an Apple Developer ID.
-3. **CI:** there is none. Gitea Actions could run fmt, clippy and the engine tests. The UI tests
-   need a GPU and the data, and packaging needs a macOS runner.
-4. **DNG colour matrices:** the ColorMatrix inside a DNG file is ignored, so DNG-only cameras
+3. **DNG colour matrices:** the ColorMatrix inside a DNG file is ignored, so DNG-only cameras
    missing from LibRaw's table (some Leicas, phones) stop at Import.
-5. **Engine work**, listed under "Next bounded work" in [docs/status.md](docs/status.md):
+4. **Engine work**, listed under "Next bounded work" in [docs/status.md](docs/status.md):
    - re-audit the decoder (vendored Classic is at dbe90dc, upstream has moved on; truncated
      packed NEFs are zero-filled);
    - end-to-end calibration, cross-checked against Siril;
    - a colour and master-format ADR;
    - a stellar PSF study.
-6. **Matte:** lamp-lit swaying foliage (Maplewood) still needs painted corrections.
-7. **Parked:** the HDR bracket merger (`tools/proto/hdr.py`) needs a tripod bracket shot at a
+5. **Matte:** lamp-lit swaying foliage (Maplewood) still needs painted corrections.
+6. **Parked:** the HDR bracket merger (`tools/proto/hdr.py`) needs a tripod bracket shot at a
    fixed ISO 64.
 
 ## Owner steps pending
@@ -127,7 +129,9 @@ cargo test --locked --release --workspace --no-fail-fast
 
 ## Known risks
 
-- No CI: nothing checks `main` except a local run.
+- CI has no GPU or test data, so the screen tests and the full-pipeline runs are checked only
+  locally. It uses the newest stable Rust, so a new clippy lint can turn it red without a code
+  change.
 - About 800 cameras are matched by model name and checked against rawspeed's camera list, but
   not against photos. Cameras newer than LibRaw 0.22.1's table stop at Import until the table is
   refreshed.
@@ -155,7 +159,8 @@ Moving off the Mac Pro:
 - Any clone builds.
 - Packaging, Metal and the UI tests need a Mac with rustup stable, both macOS targets, Xcode's
   command-line tools and `cargo-about`.
-- The compile checks and engine tests should work on any machine.
+- CI runs the compile checks and engine tests on GitHub's hosted runners, so they need no machine
+  of ours.
 - Copy `.sources/` only to a machine that will refresh the vendored code.
 
 ## First three things on resume
@@ -163,4 +168,5 @@ Moving off the Mac Pro:
 1. Mount the Work drive, pull `main` from both remotes, then run the checks and the full tests
    above. This confirms the toolchain still works; the first build is a full one.
 2. Run the six steps by hand on a real folder and write down what breaks (open item 1).
-3. Set up CI (open item 3).
+3. Check that CI on GitHub's Actions tab is green on `main`, then take the next open item: DNG
+   colour matrices (open item 3) would help the most users.
