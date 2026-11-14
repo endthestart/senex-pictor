@@ -4,27 +4,23 @@ An open-source nightscape stacker written in Rust: a night of frames from a trip
 photo, with the sky stacked and the foreground as it was shot. The app and its command are
 `pictor` (Pictor.app on macOS).
 
-## 0.1.0 preview: read this first
+## 0.2.0 preview: read this first
 
-Most people cannot run 0.1.0 on their own photos.
+Pictor has been tested with real photos from only two cameras.
 
-- **Cameras:** 0.1.0 has colour matrices only for the Nikon Z6 II and D700, the only cameras it
-  has been tested on. Import stops on any other camera.
-- **Lens data:** 0.1.0 reads lensfun's vignetting database but does not include it. Install
-  [darktable](https://www.darktable.org/) or Homebrew's `lensfun`, or set `PICTOR_LENSFUN` to the
-  database folder. Without it, Import stops.
+- **Cameras:** colour matrices for about 800 cameras are built in (LibRaw 0.22.1's table), found
+  by the model name the camera writes into its files. Import stops on a camera the table does
+  not name, such as one released after it. Only the Nikon Z6 II and D700 have been tested with
+  real photos.
+- **Lens data:** lensfun's vignetting database (published 2026-11-04) is built in, so darktable
+  or Homebrew's `lensfun` is no longer needed. Import stops on a lens with no vignetting profile.
+  To use another copy of the database, set `PICTOR_LENSFUN` to its folder.
 - **Platforms:** the release is a macOS build (12 or later, Apple silicon and Intel). Linux and
   Windows compile but have never been run.
 - **Signing:** the build is ad hoc signed, not notarized, so macOS blocks the first open. Try to
   open it, then choose Open Anyway in System Settings > Privacy & Security.
 - **Testing:** headless tests drive all six screens, but nobody has yet taken a real folder
   through them by hand.
-
-Since 0.1.0, `main` builds in colour matrices for about 800 cameras (LibRaw 0.22.1's table,
-found by the model name the files write) and lensfun's lens database, so neither limit above
-applies to a build from source. Import still stops on a camera the table does not name, such as
-one released after it, and on a lens with no vignetting profile. Only the Z6 II and D700 have
-been tested with real photos. No release includes this yet.
 
 To try it, download `Pictor-macos.zip` from [Releases](../../releases), or build from source with
 Rust stable: `cargo run --release -p pictor`.

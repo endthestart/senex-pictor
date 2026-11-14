@@ -2746,7 +2746,7 @@ DEALINGS IN THE SOFTWARE.
 
 ==============================================================================
 MIT License (MIT)
-Used by: pictor-engine 0.1.0, egui-wgpu 0.36.2
+Used by: pictor-engine 0.2.0, egui-wgpu 0.36.2
 
 Copyright (c) 2018-2021 Emil Ernerfeldt <emil.ernerfeldt@gmail.com>
 
@@ -4199,7 +4199,7 @@ SOFTWARE.
 
 ==============================================================================
 MIT License (MIT)
-Used by: pictor-engine 0.1.0
+Used by: pictor-engine 0.2.0
 
 MIT License
 
@@ -4226,7 +4226,7 @@ SOFTWARE.
 
 ==============================================================================
 MIT License (MIT)
-Used by: pictor 0.1.0, lcc-brand 26.43.7, lcc-color 26.43.7, lcc-geom 26.43.7, lcc-meta 26.43.7, lcc-raster 26.43.7, lcc-raw 26.43.7, lcc-tiff 26.43.7, accesskit 0.24.1, accesskit_atspi_common 0.18.1, accesskit_consumer 0.35.0, accesskit_consumer 0.36.0, accesskit_consumer 0.38.0, accesskit_macos 0.26.3, accesskit_unix 0.21.1, accesskit_windows 0.32.1, block2 0.5.1, block2 0.6.2, brotli-decompressor 5.0.3, chrono 0.4.45, dispatch2 0.3.1, dispatch 0.2.0, dpi 0.1.2, ecolor 0.36.2, eframe 0.36.2, egui-winit 0.36.2, egui 0.36.2, emath 0.36.2, epaint 0.36.2, libm 0.2.16, objc-sys 0.3.5, objc2-app-kit 0.2.2, objc2-app-kit 0.3.2, objc2-core-foundation 0.3.2, objc2-core-graphics 0.3.2, objc2-encode 4.1.0, objc2-foundation 0.2.2, objc2-foundation 0.3.2, objc2-io-kit 0.3.2, objc2-metal 0.3.2, objc2-quartz-core 0.3.2, objc2 0.5.3, objc2 0.6.5, profiling 1.0.18, type-map 0.5.1, windows-collections 0.2.0, windows-collections 0.3.2, windows-core 0.61.2, windows-core 0.62.2, windows-future 0.2.1, windows-future 0.3.2, windows-implement 0.60.2, windows-interface 0.59.3, windows-link 0.1.3, windows-link 0.2.1, windows-numerics 0.2.0, windows-numerics 0.3.1, windows-result 0.3.4, windows-result 0.4.1, windows-strings 0.4.2, windows-strings 0.5.1, windows-sys 0.52.0, windows-sys 0.59.0, windows-sys 0.61.2, windows-targets 0.52.6, windows-threading 0.1.0, windows-threading 0.2.1, windows 0.61.3, windows 0.62.2, windows_x86_64_gnu 0.52.6, windows_x86_64_msvc 0.52.6
+Used by: pictor 0.2.0, lcc-brand 26.43.7, lcc-color 26.43.7, lcc-geom 26.43.7, lcc-meta 26.43.7, lcc-raster 26.43.7, lcc-raw 26.43.7, lcc-tiff 26.43.7, accesskit 0.24.1, accesskit_atspi_common 0.18.1, accesskit_consumer 0.35.0, accesskit_consumer 0.36.0, accesskit_consumer 0.38.0, accesskit_macos 0.26.3, accesskit_unix 0.21.1, accesskit_windows 0.32.1, block2 0.5.1, block2 0.6.2, brotli-decompressor 5.0.3, chrono 0.4.45, dispatch2 0.3.1, dispatch 0.2.0, dpi 0.1.2, ecolor 0.36.2, eframe 0.36.2, egui-winit 0.36.2, egui 0.36.2, emath 0.36.2, epaint 0.36.2, libm 0.2.16, objc-sys 0.3.5, objc2-app-kit 0.2.2, objc2-app-kit 0.3.2, objc2-core-foundation 0.3.2, objc2-core-graphics 0.3.2, objc2-encode 4.1.0, objc2-foundation 0.2.2, objc2-foundation 0.3.2, objc2-io-kit 0.3.2, objc2-metal 0.3.2, objc2-quartz-core 0.3.2, objc2 0.5.3, objc2 0.6.5, profiling 1.0.18, type-map 0.5.1, windows-collections 0.2.0, windows-collections 0.3.2, windows-core 0.61.2, windows-core 0.62.2, windows-future 0.2.1, windows-future 0.3.2, windows-implement 0.60.2, windows-interface 0.59.3, windows-link 0.1.3, windows-link 0.2.1, windows-numerics 0.2.0, windows-numerics 0.3.1, windows-result 0.3.4, windows-result 0.4.1, windows-strings 0.4.2, windows-strings 0.5.1, windows-sys 0.52.0, windows-sys 0.59.0, windows-sys 0.61.2, windows-targets 0.52.6, windows-threading 0.1.0, windows-threading 0.2.1, windows 0.61.3, windows 0.62.2, windows_x86_64_gnu 0.52.6, windows_x86_64_msvc 0.52.6
 
 MIT License
 
@@ -4277,7 +4277,7 @@ SOFTWARE.
 
 ==============================================================================
 MIT License (MIT)
-Used by: pictor-engine 0.1.0
+Used by: pictor-engine 0.2.0
 
 MIT License
 

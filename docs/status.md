@@ -233,8 +233,8 @@ Decoder-provided defaults versus explicitly recorded camera values need deeper a
 
 ## Next bounded work
 
-The 0.1.0 preview's limits are in the [README](../README.md). Since then (2026-11-05) colour
-matrices for 790 entries of LibRaw 0.22.1's table are built in, found by whole model name plus
+The 0.2.0 preview's limits are in the [README](../README.md). Since 0.1.0, colour matrices for
+790 entries of LibRaw 0.22.1's table are built in (2026-11-05), found by whole model name plus
 the families and regional names listed in `tools/colour_matrices.py`; against rawspeed's camera
 list as an oracle, 669 of its 1,087 names resolve and none to another camera's matrix (51 carry
 a different Adobe matrix version than rawspeed's, mostly pre-2010 bodies). lensfun's database

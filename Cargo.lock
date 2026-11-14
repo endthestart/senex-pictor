@@ -2566,7 +2566,7 @@ dependencies = [
 
 [[package]]
 name = "pictor"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bytemuck",
  "eframe",
@@ -2586,7 +2586,7 @@ dependencies = [
 
 [[package]]
 name = "pictor-engine"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bytemuck",
  "half",
