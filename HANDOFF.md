@@ -27,8 +27,7 @@ and the rest, listed in the [README](README.md)).
 | What | Where | Version |
 | --- | --- | --- |
 | Source | `main` on Gitea (`origin`, `git@gitea.andermic.net:endthestart/andermic-star-stacker.git`) and public GitHub (`github`, `git@github.com:endthestart/senex-pictor.git`) | `main` |
-| Release | GitHub Releases, "0.1.0 preview" (pre-release, tag `v0.1.0`, 2026-11-02): `Pictor-macos.zip`, universal, ad hoc signed | 0.1.0 |
-| Unreleased on `main` | Colour matrices for about 800 cameras (LibRaw 0.22.1's table) and lensfun's lens database (published 2026-11-04), built in | after `v0.1.0` |
+| Release | [GitHub Releases](https://github.com/endthestart/senex-pictor/releases), "0.2.0 preview" (pre-release, tag `v0.2.0`, 2026-11-13): `Pictor-macos.zip`, universal, ad hoc signed. It adds built-in colour matrices for about 800 cameras (LibRaw 0.22.1's table) and lensfun's lens database (published 2026-11-04) to the 0.1.0 preview of 2026-11-02 | 0.2.0 |
 | Private test data (`$STAR_DATA`) | `/Volumes/Work/star-photos-data` on the Work drive, an external PCIe SSD | n/a |
 | Original photos | NAS | n/a |
 | Upstream clones and oracles | `.sources/` in the repo folder (500 MB, ignored by git) | n/a |
@@ -41,13 +40,15 @@ running processes. The GitHub release is the only thing deployed.
 - **Milestones:** the stacker runs from RAW folder to finished image. The six-step app (M4) is
   verified by headless tests, but nobody has taken a real folder through it by hand. The
   milestone table is in [docs/status.md](docs/status.md).
-- **Last full check:** 2026-11-05, on the code `main` has now. All 64 workspace tests passed
-  with all five UI test folders set; fmt, clippy and the vendored-source check (166 files) were
-  clean.
+- **Last full check:** 2026-11-13, for 0.2.0. fmt, clippy and the vendored-source check
+  (166 files) were clean. 63 of the 64 workspace tests passed with all five UI test folders set.
+  The moment test failed only because of what earlier runs left in its folder, and it passed
+  on a clean copy (open item 3).
 - **Real photos:** only from a Nikon Z6 II and a D700.
-- **Machine:** the Mac Pro (Intel, macOS 15.7.4, Rust 1.99.1). On 2026-11-13 the build
-  output, prototype caches, POC outputs and `dist/` were cleared, so the next build starts from
-  scratch. `.venv` (for `tools/icon.py` and the prototypes) and `.venv-sam` remain.
+- **Machine:** the Mac Pro (Intel, macOS 15.7.4, Rust 1.99.1). After the release the build
+  output and `dist/` were cleared again, as were the prototype caches and POC outputs, so the
+  next build starts from scratch. `.venv` (for `tools/icon.py` and the prototypes) and
+  `.venv-sam` remain.
 
 ## Run, test, package, release
 
@@ -81,7 +82,8 @@ cargo test --locked --release --workspace --no-fail-fast
   and `dist/Pictor-macos.zip`, refreshing the Third-Party Notices with `cargo-about` 0.9.3 first.
   It needs both macOS Rust targets and Xcode's command-line tools.
 - **Release (owner's yes):**
-  1. Bump `version` in `Cargo.toml` and `app/Cargo.toml`, and update the README's 0.1.0 section.
+  1. Bump `version` in `Cargo.toml` and `app/Cargo.toml`, run `cargo update --workspace`, and
+     update the README's preview section.
   2. Package.
   3. Tag the release and publish it on GitHub with the zip.
 - **Refresh the built-in data:**
@@ -96,10 +98,14 @@ cargo test --locked --release --workspace --no-fail-fast
 
 1. **Hand run:** take a real folder through the app's six steps by hand, then fix what it finds.
    This is the M4 gate.
-2. **Release 0.2.0** with the built-in colour matrices and lens database. Most 0.1.0 users
-   cannot import their photos without them.
-3. **Notarization:** the release is ad hoc signed, so macOS blocks the first open. Notarizing
+2. **Notarization:** the release is ad hoc signed, so macOS blocks the first open. Notarizing
    needs an Apple Developer ID.
+3. **Repeatable moment test:** `a_moment_is_made_from_the_scene_step` (`app/tests/ui_scene.rs`)
+   fails once its `PICTOR_UI_STACKED` folder already holds a hero and a moment for the chosen
+   frame, because Scene then offers no "Make It". Earlier runs left both in
+   `app-test/bwca-stack`, as `hero-DSC_0950*`, `hero-occ` and `moment-DSC_0950*`. It also clicks
+   the last "Make It", which is the hero's when only the moment exists. Fix the test, or remove
+   those results before each full run.
 4. **CI:** there is none. Gitea Actions could run fmt, clippy and the engine tests. The UI tests
    need a GPU and the data, and packaging needs a macOS runner.
 5. **DNG colour matrices:** the ColorMatrix inside a DNG file is ignored, so DNG-only cameras
@@ -163,4 +169,4 @@ Moving off the Mac Pro:
 1. Mount the Work drive, pull `main` from both remotes, then run the checks and the full tests
    above. This confirms the toolchain still works; the first build is a full one.
 2. Run the six steps by hand on a real folder and write down what breaks (open item 1).
-3. If that run is clean, release 0.2.0 with the built-in camera and lens data (open item 2).
+3. Make the moment test repeatable (open item 3), then set up CI (open item 4).
