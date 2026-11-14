@@ -90,8 +90,8 @@ impl Import {
                 painter.rect_filled(grip, CornerRadius::same(3), ACCENT);
             }
             let ticks = strip.max.y + 4.0;
-            for i in a..=b {
-                let name = &survey.captures[i].name;
+            for (i, capture) in survey.captures.iter().enumerate().take(b + 1).skip(a) {
+                let name = &capture.name;
                 let color = if run.overexposed.contains(name) {
                     BAD
                 } else if run.lit.contains(name) {
