@@ -26,7 +26,7 @@ and the rest, listed in the [README](README.md)).
 
 | What | Where | Version |
 | --- | --- | --- |
-| Source | `main` on Gitea (`origin`, `git@gitea.andermic.net:endthestart/andermic-star-stacker.git`) and public GitHub (`github`, `git@github.com:endthestart/senex-pictor.git`) | `main` |
+| Source | `main` on Gitea (`origin`, `git@gitea.andermic.net:endthestart/senex-pictor.git`) and public GitHub (`github`, `git@github.com:endthestart/senex-pictor.git`) | `main` |
 | Release | [GitHub Releases](https://github.com/endthestart/senex-pictor/releases), "0.2.0 preview" (pre-release, tag `v0.2.0`, 2026-11-13): `Pictor-macos.zip`, universal, ad hoc signed. It adds built-in colour matrices for about 800 cameras (LibRaw 0.22.1's table) and lensfun's lens database (published 2026-11-04) to the 0.1.0 preview of 2026-11-02 | 0.2.0 |
 | CI | GitHub Actions on the public repo (`.github/workflows/ci.yml`), on every push to `main` and every pull request. On macOS: fmt, the vendored-source check, clippy, and the engine and design-token tests. On Linux: a compile check | n/a |
 | Private test data (`$STAR_DATA`) | `/Volumes/Work/star-photos-data` on the Work drive, an external PCIe SSD | n/a |
@@ -118,8 +118,6 @@ cargo test --locked --release --workspace --no-fail-fast
 
 ## Owner steps pending
 
-- **Rename the Gitea repo** to `senex-pictor`, then run
-  `git remote set-url origin git@gitea.andermic.net:endthestart/senex-pictor.git`.
 - **Get an Apple Developer ID** to notarize builds.
 - **Run the app's six steps by hand** (open item 1).
 - **Name a NAS path for `.sources/`** so it can be copied there.
