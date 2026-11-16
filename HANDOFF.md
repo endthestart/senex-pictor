@@ -31,7 +31,7 @@ and the rest, listed in the [README](README.md)).
 | CI | GitHub Actions on the public repo (`.github/workflows/ci.yml`), on every push to `main` and every pull request. On macOS: fmt, the vendored-source check, clippy, and the engine and design-token tests. On Linux: a compile check | n/a |
 | Private test data (`$STAR_DATA`) | `/Volumes/Work/star-photos-data` on the Work drive, an external PCIe SSD | n/a |
 | Original photos | NAS | n/a |
-| Upstream clones and oracles | `.sources/` in the repo folder (500 MB, ignored by git) | n/a |
+| Upstream clones and oracles | `.sources/` in the repo folder (500 MB, ignored by git). A copy is on the NAS at `/Volumes/storage/development/pictor-sources`, checked by SHA-256 on 2026-11-16 | n/a |
 
 There are no other branches, stashes, worktrees, open pull requests, servers or running
 processes. Only the GitHub release is deployed, and only GitHub's hosted runners run CI.
@@ -120,7 +120,6 @@ cargo test --locked --release --workspace --no-fail-fast
 
 - **Get an Apple Developer ID** to notarize builds.
 - **Run the app's six steps by hand** (open item 1).
-- **Name a NAS path for `.sources/`** so it can be copied there.
 - **Fix the website:** it still says Pictor's source opens with its first release. The website
   session was told on 2026-11-02.
 - **Approve any public release** before it goes out.
@@ -159,7 +158,8 @@ Moving off the Mac Pro:
   command-line tools and `cargo-about`.
 - CI runs the compile checks and engine tests on GitHub's hosted runners, so they need no machine
   of ours.
-- Copy `.sources/` only to a machine that will refresh the vendored code.
+- Copy `.sources/` (from this Mac or the NAS) only to a machine that will refresh the vendored
+  code.
 
 ## First three things on resume
 
